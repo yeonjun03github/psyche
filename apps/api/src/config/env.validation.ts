@@ -1,0 +1,48 @@
+import { z } from 'zod';
+
+export const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(4000),
+  API_PREFIX: z.string().default('api/v1'),
+
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+
+  REDIS_HOST: z.string().default('localhost'),
+  REDIS_PORT: z.coerce.number().int().positive().default(6379),
+
+  JWT_ACCESS_SECRET: z.string().min(1, 'JWT_ACCESS_SECRET is required'),
+  JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+  JWT_REFRESH_SECRET: z.string().min(1, 'JWT_REFRESH_SECRET is required'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+
+  // 특정 벤더에 종속되지 않도록 AI_PROVIDER 하나로 Gemini/OpenAI/Groq 중 사용할 Provider를 고른다.
+  AI_PROVIDER: z.enum(['gemini', 'openai', 'groq']).default('gemini'),
+
+  GEMINI_API_KEY: z.string().optional(),
+  // 특정 모델 버전이 아니라 별칭(alias)을 기본값으로 둔다 — 특정 버전은 예고 없이
+  // 신규 사용자에게 서비스 종료될 수 있음을 실제로 겪었다(gemini-2.5-flash 404).
+  GEMINI_MODEL: z.string().default('gemini-flash-latest'),
+
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().default('gpt-4.1'),
+
+  GROQ_API_KEY: z.string().optional(),
+  GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
+
+  FILE_STORAGE_ROOT: z.string().default('./storage'),
+
+  // 개인용 도구이므로 공개 회원가입이 없다 — 유일한 계정을 시드 스크립트로 생성한다(9절 Auth 참고).
+  ADMIN_EMAIL: z.string().email().default('me@psyche.local'),
+  ADMIN_PASSWORD: z.string().min(8).default('changeme123!'),
+  ADMIN_NAME: z.string().default('Owner'),
+});
+
+export type EnvConfig = z.infer<typeof envSchema>;
+
+export function validateEnv(config: Record<string, unknown>): EnvConfig {
+  const result = envSchema.safeParse(config);
+  if (!result.success) {
+    throw new Error(`환경 변수 검증 실패:\n${result.error.issues.map((i) => `- ${i.path.join('.')}: ${i.message}`).join('\n')}`);
+  }
+  return result.data;
+}

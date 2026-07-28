@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== User ====================
+
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ==================== TestDefinition ====================
+// 문항/채점규칙은 항상 통째로 조회되므로 embed(composite type)한다.
+
+enum TestCategory {
+  ESSENTIAL
+  OPTIONAL
+}
+
+type QuestionOption {
+  value Int
+  label String
+}
+
+type Question {
+  questionId    String
+  order         Int
+  text          String
+  type          String
+  options       QuestionOption[]
+  reverseScored Boolean @default(false)
+}
+
+/// min/max는 Float다 — BRS처럼 평균(합÷6)으로 채점하는 검사는 정수가 아닌 원점수(예: 3.83)를
+/// 가지므로, 정수로 두면 경계값 사이 구간이 어느 밴드에도 속하지 않는 틈이 생긴다.
+type ScoreBand {
+  min         Float
+  max         Float
+  label       String
+  description String
+}
+
+/// 하위척도(예: Big Five의 5개 요인). 자체 문항 목록과 밴드(해석 구간)를 가진다.
+type Subscale {
+  name        String
+  questionIds String[]
+  bands       ScoreBand[]
+}
+
+/// 위기 신호 문항 정의 — 안전장치(2.4절)의 근거 데이터
+type RiskFlag {
+  questionId   String
+  triggerValue Int
+  message      String
+}
+
+/// 채점 공식은 모든 검사가 공통으로 "역채점 보정 후 합산 → (× multiplier) ÷ divisor → 밴드 매핑"
+/// 형태를 따른다(단순 합산=divisor 1, WHO-5처럼 ×4=multiplier 4, BRS처럼 평균=divisor 6).
+/// 검사마다 다른 것은 이 공식이 아니라 데이터(문항 수, 방향, 배점, 밴드 구간)뿐이므로
+/// 검사별 Scorer 클래스를 따로 두지 않고 하나의 데이터 기반 GenericTestScorer로 처리한다.
+type ScoringConfig {
+  multiplier Int         @default(1)
+  divisor    Int         @default(1)
+  bands      ScoreBand[]
+  subscales  Subscale[]
+  riskFlags  RiskFlag[]
+}
+
+type LicenseInfo {
+  required Boolean @default(false)
+  notice   String?
+  url      String?
+}
+
+model TestDefinition {
+  id                String        @id @default(auto()) @map("_id") @db.ObjectId
+  code              String        @unique
+  name              String
+  category          TestCategory
+  description       String
+  estimatedMinutes  Int
+  version           Int           @default(1)
+  responseScaleMin  Int
+  responseScaleMax  Int
+  license           LicenseInfo
+  questions         Question[]
+  scoringConfig     ScoringConfig
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@map("test_definitions")
+}
+
+// ==================== TestSession ====================
+// 응시 1회 = 세션 1개. 답변은 이어하기 기능의 근거이므로 embed한다.
+// 여기의 점수는 "해당 검사 자체의 원점수/밴드"이며, 정규화/표준화는 PersonModel의 몫이다.
+
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+type Answer {
+  questionId String
+  value      Int
+  answeredAt DateTime
+}
+
+type SessionSubscaleScore {
+  name     String
+  rawScore Float
+  band     String
+}
+
+model TestSession {
+  id                    String                 @id @default(auto()) @map("_id") @db.ObjectId
+  userId                String                 @db.ObjectId
+  testDefinitionId      String                 @db.ObjectId
+  testCode              String
+  testDefinitionVersion Int
+  status                SessionStatus          @default(IN_PROGRESS)
+  answers               Answer[]
+  currentPosition       Int                    @default(0)
+  startedAt             DateTime               @default(now())
+  completedAt           DateTime?
+  rawScore              Float?
+  band                  String?
+  subscaleScores        SessionSubscaleScore[]
+  riskTriggered         Boolean                @default(false)
+
+  @@index([userId, testCode])
+  @@map("test_sessions")
+}
+
+// ==================== PersonModel ====================
+// IntegrationModule의 산출물. 검사 간 상관관계·해석은 담지 않는다 —
+// 오직 표준화된 사실(정규화 점수)만 담는다. 해석은 AIReport(LLM)의 몫이다.
+
+type PersonModelSubscaleScore {
+  name            String
+  rawScore        Float
+  normalizedScore Int
+  band            String
+}
+
+/// rawScore/normalizedScore/band는 단일 척도 검사(예: PHQ-9)에서만 채워지고,
+/// Big Five처럼 하위척도만 있는 검사는 subscaleScores만 채워진다(둘 다 있을 이유는 없다).
+type PersonModelTestResult {
+  testCode              String
+  testDefinitionVersion Int
+  rawScore              Float?
+  normalizedScore       Int?
+  band                  String?
+  subscaleScores        PersonModelSubscaleScore[]
+  completedAt           DateTime
+}
+
+type PersonModelMetadata {
+  completedEssentialCount Int
+  totalEssentialCount     Int      @default(7)
+  previousPersonModelId   String?  @db.ObjectId
+  generatedAt             DateTime
+}
+
+model PersonModel {
+  id               String                  @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String                  @db.ObjectId
+  sourceSessionIds String[]                @db.ObjectId
+  version          Int                     @default(1)
+  testResults      PersonModelTestResult[]
+  metadata         PersonModelMetadata
+
+  @@index([userId])
+  @@map("person_models")
+}
+
+// ==================== AIReport ====================
+// PersonModel을 입력받아 AI(LLM)가 통합 해석을 수행한 결과.
+// 필드 구성은 packages/shared/src/types/ai-report.ts의 AIReportSections와 1:1 대응된다.
+
+enum ReportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+type ReportSections {
+  overallSummary              String
+  personalityProfile          String
+  currentMentalHealthStatus   String
+  primaryConcern               String
+  primaryStrength               String
+  crossTestCorrelations          String
+  possibleCausalHypotheses        String
+  maintainingFactors                String
+  aggravatingFactors                 String
+  highestLeverageChangeFactor          String
+  priorityIssues                        String
+  improvementRoadmap                     String
+  metricsToTrack                          String
+  recommendedRetestTiming                  String
+}
+
+model AIReport {
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String          @db.ObjectId
+  personModelId String          @db.ObjectId
+  status        ReportStatus    @default(PENDING)
+  model         String?
+  promptVersion String?
+  sections      ReportSections?
+  pdfFileId     String?         @db.ObjectId
+  failureReason String?
+  createdAt     DateTime        @default(now())
+  completedAt   DateTime?
+
+  @@index([userId])
+  @@map("ai_reports")
+}
+
+// ==================== PdfFile ====================
+// storageKey는 스토리지 구현체(로컬 디스크 → 추후 S3 등)에 독립적인 식별자다.
+
+model PdfFile {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  reportId    String   @db.ObjectId
+  storageKey  String
+  path        String
+  generatedAt DateTime @default(now())
+
+  @@map("pdf_files")
+}
