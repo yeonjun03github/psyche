@@ -15,20 +15,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status = isHttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const body = isHttpException ? exception.getResponse() : null;
 
-    const message =
-      typeof body === 'string'
-        ? body
-        : ((body as { message?: string | string[] })?.message ?? '서버 오류가 발생했습니다.');
-
     if (!isHttpException) {
       this.logger.error(exception instanceof Error ? exception.stack : exception);
     }
 
-    response.status(status).json({
-      statusCode: status,
-      message,
-      path: request.url,
-      timestamp: new Date().toISOString(),
-    });
+    const meta = { statusCode: status, path: request.url, timestamp: new Date().toISOString() };
+
+    // Terminus 헬스체크 등 body가 구조화된 객체인 예외는 그 내용(예: 어떤 서비스가 왜
+    // 죽었는지)을 그대로 보존한다 — 단순 message 문자열로 뭉개면 원인을 알 수 없게 된다.
+    if (body && typeof body === 'object') {
+      response.status(status).json({ ...body, ...meta });
+      return;
+    }
+
+    const message = typeof body === 'string' ? body : '서버 오류가 발생했습니다.';
+    response.status(status).json({ ...meta, message });
   }
 }
