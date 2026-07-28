@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@psyche/web", "dev"],
       "port": 3000
+    },
+    {
+      "name": "psyche-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@psyche/api", "dev"],
+      "port": 4000
     }
   ]
 }

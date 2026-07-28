@@ -39,17 +39,15 @@ export default async function Home() {
       <header>
         <h1 className="text-2xl font-semibold">Psyche</h1>
         <p className="mt-1 text-sm text-neutral-500">
-          여러 심리검사 결과를 AI가 하나의 사람으로 통합 해석하는 심리 리포트 플랫폼
+          여러 심리검사 결과를 AI가 통합 해석하는 심리 리포트 플랫폼
         </p>
       </header>
 
       <section>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-col items-start gap-1">
           <h2 className="text-lg font-medium">필수 검사 ({completedCount}/{essentialTests.length})</h2>
-          <div className="flex items-center gap-4">
-            <ResetProgressButton disabled={!hasInProgress} />
-            <ResetAllButton />
-          </div>
+          <ResetProgressButton disabled={!hasInProgress} />
+          <ResetAllButton />
         </div>
         <ul className="flex flex-col gap-2">
           {essentialTests.map((test) => {

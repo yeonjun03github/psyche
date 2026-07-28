@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Psyche",
-  description: "여러 심리검사 결과를 AI가 하나의 사람으로 통합 해석하는 심리 리포트 플랫폼",
+  description: "여러 심리검사 결과를 AI가 통합 해석하는 심리 리포트 플랫폼",
 };
 
 export default function RootLayout({

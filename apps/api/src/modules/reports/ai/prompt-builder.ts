@@ -23,7 +23,7 @@ export interface BuiltPrompt {
   userPrompt: string;
 }
 
-const SYSTEM_PROMPT = `당신은 여러 심리검사 결과를 하나의 사람으로 통합 해석하는 역할을 맡습니다.
+const SYSTEM_PROMPT = `당신은 여러 심리검사 결과를 하나로 통합 해석하는 역할을 맡습니다.
 
 반드시 지켜야 할 규칙:
 1. 의학적 진단, 질병 판정, 치료 권고를 하지 않습니다. 당신은 해석만 합니다.
