@@ -8,7 +8,7 @@ import { reportSectionsSchema, reportSectionsJsonSchema, type ReportSections } f
 import { REPORT_GENERATION_QUEUE } from './report-generation.queue';
 import { computeAssessmentTimeline } from '../../integration/domain/assessment-timeline';
 import { diffPersonModels, toPersonModelDiffInput, type PersonModelSnapshot } from '../../integration/domain/person-model-diff';
-import { summarizeFeedbackHistory, type FeedbackEntry } from '../domain/feedback-summary';
+import { summarizeFeedbackHistory } from '../domain/feedback-summary';
 
 export interface ReportGenerationJobData {
   reportId: string;
@@ -49,8 +49,20 @@ export class ReportGenerationProcessor extends WorkerHost {
         })),
       );
 
+      const pastReports = await this.prisma.aIReport.findMany({
+        where: { userId: report.userId, status: 'COMPLETED', id: { not: report.id } },
+        select: { feedback: true, sections: { select: { dailyQuoteId: true } } },
+      });
+
       const previousComparison = await this.buildPreviousComparison(personModel);
-      const priorFeedback = await this.buildPriorFeedback(report.userId, report.id);
+      const priorFeedback = summarizeFeedbackHistory(
+        pastReports.map((r) =>
+          r.feedback.map((f) => ({ section: f.section, verdict: f.verdict, note: f.note, updatedAt: f.updatedAt })),
+        ),
+      );
+      const usedQuoteIds = pastReports
+        .map((r) => r.sections?.dailyQuoteId)
+        .filter((id): id is string => id != null);
 
       const { systemPrompt, userPrompt } = buildReportPrompt({
         testResults: personModel.testResults.map((t) => ({
@@ -68,6 +80,7 @@ export class ReportGenerationProcessor extends WorkerHost {
         timeline,
         previousComparison,
         priorFeedback,
+        usedQuoteIds,
       });
 
       const raw = await this.aiProvider.generateJson({
@@ -111,21 +124,6 @@ export class ReportGenerationProcessor extends WorkerHost {
     if (!previous) return null;
 
     return diffPersonModels(toPersonModelDiffInput(previous), toPersonModelDiffInput(personModel));
-  }
-
-  /**
-   * "가장 최근 리포트"가 아니라 이 사용자의 완료된 리포트 전부를 모아 섹션별로 집계한다 —
-   * 반복적으로 부정/확인된 패턴 자체가 참고 정보로서 가치가 있기 때문(feedback-summary.ts 참고).
-   */
-  private async buildPriorFeedback(userId: string, currentReportId: string) {
-    const pastReports = await this.prisma.aIReport.findMany({
-      where: { userId, status: 'COMPLETED', id: { not: currentReportId } },
-      select: { feedback: true },
-    });
-    const allFeedback: FeedbackEntry[][] = pastReports.map((r) =>
-      r.feedback.map((f) => ({ section: f.section, verdict: f.verdict, note: f.note, updatedAt: f.updatedAt })),
-    );
-    return summarizeFeedbackHistory(allFeedback);
   }
 
   /** LLM이 프롬프트 지시(previousComparison 없으면 null)를 어겨도 코드가 방어적으로 한 번 더 강제한다. */

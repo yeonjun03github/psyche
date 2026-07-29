@@ -2,6 +2,7 @@ import { AI_REPORT_SECTION_LABELS, CLAIM_SECTION_KEYS } from '@psyche/shared';
 import type { AssessmentTimeline } from '../../integration/domain/assessment-timeline';
 import type { PersonModelDiff } from '../../integration/domain/person-model-diff';
 import type { FeedbackTally } from '../domain/feedback-summary';
+import { QUOTE_BANK } from './quote-bank';
 
 export interface PromptSubscaleResult {
   name: string;
@@ -27,6 +28,8 @@ export interface BuildReportPromptInput {
   previousComparison?: PersonModelDiff | null;
   /** 과거 리포트들에 대한 사용자 피드백 집계(횟수) — 확정된 사실이 아니라 참고 정보 */
   priorFeedback?: FeedbackTally[];
+  /** 이 사용자의 과거 리포트에서 이미 선택된 명언 id — 후보 목록에서 제외해 반복을 코드 차원에서 막는다 */
+  usedQuoteIds?: string[];
 }
 
 export interface BuiltPrompt {
@@ -39,7 +42,7 @@ export interface BuiltPrompt {
  * 생성됐는지 추적한다(재현성). 프롬프트 텍스트나 섹션 구성이 바뀔 때만 값을 올린다 — 스키마
  * 버전을 따로 두지 않는 이유는 둘이 항상 같이 바뀌기 때문(불필요한 중복 카운터 방지).
  */
-export const PROMPT_VERSION = '6';
+export const PROMPT_VERSION = '7';
 
 /** 이 5개는 이전 리포트가 없으면 반드시 null이어야 하는 종단 비교 섹션이다. */
 const LONGITUDINAL_SECTION_KEYS = new Set([
@@ -170,9 +173,28 @@ claimsConfidence.evidence 필드에서만 사용하십시오.
       가깝다고 판단한 근거인지 간단히 설명하십시오 — 유형만 나열하고 이유를 생략하지 마십시오.
     - confidence는 이 MBTI 추정 자체에 대한 확신 수준입니다. 다른 섹션보다 가볍고 유쾌한 어조를
       써도 되지만, 그래도 진단처럼 단정적으로 쓰지는 마십시오.
+16. psychNickname은 리포트 맨 앞에 놓이는 보너스입니다. 성격(Big Five), 정신건강 검사 결과,
+    그리고 사용자가 남긴 참고 메모가 있다면 그것까지 모두 종합해 "책임감 있는 회복형 이상주의자",
+    "조용한 버팀목", "신중한 탐색가"처럼 그 사람을 함축하는 한 줄 별명(nickname)을 만드십시오.
+    explanation에는 왜 그 별명을 붙였는지 2~3문장으로 설명하되, 위 섹션들의 내용을 반복하지 말고
+    "첫인상처럼 이 사람을 한마디로 요약하면"이라는 관점에서 새로 쓰십시오. 진단명이나 장애명처럼
+    들리는 표현은 피하고, 따뜻하고 존중하는 어조로 쓰십시오.
+17. keyInsightLine은 리포트 마지막 부분에 놓이는 단 한 문장입니다. 위에서 서술한 모든 섹션을
+    통틀어 이 사람에게 가장 중요하게 전달하고 싶은 통찰 하나를 골라, 다른 섹션의 표현을 그대로
+    재사용하지 말고 가장 기억에 남을 만한 한 문장으로 압축하십시오(예: "현재 가장 큰 문제는
+    능력이 부족해서가 아니라, 에너지가 바닥난 상태에서 계속 능력을 증명하려 한다는 점입니다").
+    반드시 한 문장으로만 작성하고, 여러 문장으로 늘어놓지 마십시오.
+18. dailyQuoteId는 아래 "명언 후보 목록"에 있는 id 중 하나를 그대로 반환하거나, 이 리포트와
+    잘 어울리는 후보가 없으면 null을 반환하십시오. 이 목록에 없는 명언을 새로 만들거나, 알고
+    있는 다른 명언을 시도하거나, 저자를 추측하지 마십시오 — 목록 밖의 어떤 것도 허용되지
+    않습니다. 후보 중 이 리포트의 핵심 주제(예: 무기력→희망/회복, 완벽주의→자기수용/성장,
+    불안→용기/이해, 낮은 자존감→자기존엄, 소진→자기돌봄, 새로운 시작→꾸준함)와 의미적으로
+    가장 잘 맞는 것을 고르십시오. 확신이 서지 않으면 반드시 null을 선택하십시오 — 억지로
+    끼워맞추거나 무리하게 아무거나 고르는 것보다 생략이 낫습니다.
 
 절대 하지 말 것: 검사 결과·점수 나열, 검사명 본문 반복, 같은 내용 반복, 논문/교과서 문체,
-규칙 기반으로 판정하는 듯한 서술, 의학적 진단, MBTI를 진단처럼 단정하거나 유형 하나로 확정하는 것.
+규칙 기반으로 판정하는 듯한 서술, 의학적 진단, MBTI를 진단처럼 단정하거나 유형 하나로 확정하는 것,
+명언 후보 목록에 없는 문구를 명언으로 제시하는 것, 저자가 불확실한 명언을 사용하는 것.
 
 섹션 설명:
 ${buildSectionDescriptions()}`;
@@ -229,6 +251,17 @@ function formatPriorFeedback(tally: FeedbackTally[]): string {
     .join('\n');
 }
 
+function formatQuoteCandidates(usedQuoteIds: string[]): string {
+  const usedSet = new Set(usedQuoteIds);
+  const available = QUOTE_BANK.filter((q) => !usedSet.has(q.id));
+
+  if (available.length === 0) {
+    return '이 사용자에게 남은 새 후보가 없습니다 — dailyQuoteId는 반드시 null로 반환하십시오.';
+  }
+
+  return available.map((q) => `- id: ${q.id} | "${q.quote}" — ${q.author} | 주제: ${q.themes.join(', ')}`).join('\n');
+}
+
 export function buildReportPrompt(input: BuildReportPromptInput): BuiltPrompt {
   const body = input.testResults.map(formatTestResult).join('\n');
 
@@ -253,6 +286,8 @@ ${body}`,
   if (input.priorFeedback && input.priorFeedback.length > 0) {
     blocks.push(`--- 이전 리포트들에 대한 사용자 반응 집계(참고용, 확정된 사실 아님) ---\n${formatPriorFeedback(input.priorFeedback)}`);
   }
+
+  blocks.push(`--- 명언 후보 목록(dailyQuoteId는 반드시 이 중 하나의 id이거나 null) ---\n${formatQuoteCandidates(input.usedQuoteIds ?? [])}`);
 
   blocks.push('이 결과들을 하나의 사람으로 통합 해석하여, 지정된 JSON 스키마의 필드를 모두 채워 응답하십시오.');
 

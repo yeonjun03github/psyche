@@ -242,6 +242,12 @@ type FunMbtiGuess {
   confidence    ConfidenceLevel
 }
 
+/// 리포트 최상단에 놓는 보너스 콘텐츠 — Big Five/정신건강 검사/사용자 메모를 종합한 한 줄 별명.
+type PsychNickname {
+  nickname    String
+  explanation String
+}
+
 type ReportSections {
   overallSummary              String
   personalityProfile          String
@@ -269,6 +275,12 @@ type ReportSections {
   // optional인 이유: 이 필드가 생기기 전에 저장된 기존 리포트 문서에는 없는 필드라, required로
   // 두면 그 문서들을 읽을 때(findMany 등) Prisma가 역직렬화에 실패해 전체 조회가 깨진다.
   funMbtiGuess FunMbtiGuess?
+  psychNickname PsychNickname? // 리포트 최상단 배치
+  keyInsightLine String? // "AI가 보는 한 줄" — 리포트 마지막
+  // 명언 자체가 아니라 quote-bank.ts 후보 목록의 id만 저장한다. LLM이 명언 텍스트를 다시 만들지
+  // 않게 해 할루시네이션을 구조적으로 막고, 실제 표시용 텍스트는 reports.service.ts가 조회 시점에
+  // id로 조회해 만든다(계산 가능한 값을 중복 저장하지 않는다는 원칙과 동일).
+  dailyQuoteId String?
 }
 
 model AIReport {

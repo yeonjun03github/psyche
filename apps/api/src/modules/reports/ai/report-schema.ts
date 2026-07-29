@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CLAIM_SECTION_KEYS, MBTI_TYPES } from '@psyche/shared';
+import { QUOTE_IDS } from './quote-bank';
 
 const claimConfidenceSchema = z.object({
   section: z.enum(CLAIM_SECTION_KEYS),
@@ -18,6 +19,11 @@ const funMbtiGuessSchema = z.object({
   topCandidates: z.array(mbtiCandidateSchema).length(3),
   reasoning: z.string().min(1),
   confidence: z.enum(['HIGH', 'MEDIUM', 'LOW']),
+});
+
+const psychNicknameSchema = z.object({
+  nickname: z.string().min(1),
+  explanation: z.string().min(1),
 });
 
 /**
@@ -47,6 +53,10 @@ export const reportSectionsSchema = z.object({
   areasToWatch: z.string().nullable(),
   claimsConfidence: z.array(claimConfidenceSchema),
   funMbtiGuess: funMbtiGuessSchema,
+  psychNickname: psychNicknameSchema,
+  keyInsightLine: z.string().min(1),
+  // quote-bank.ts에 없는 id는 구조적으로 아예 생성 불가 — 확신 없으면 null로 생략(요청 원칙 10번).
+  dailyQuoteId: z.enum(QUOTE_IDS).nullable(),
 });
 
 export type ReportSections = z.infer<typeof reportSectionsSchema>;

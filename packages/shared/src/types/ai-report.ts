@@ -28,10 +28,20 @@ export interface AIReportSections {
   /** 프로젝트 핵심 분석이 아닌 보너스 이스터에그 — 실제 MBTI 검사가 아니라 AI의 참고용 재해석.
    *  이 필드가 생기기 전에 만들어진 기존 리포트는 null이다. */
   funMbtiGuess: FunMbtiGuess | null;
+  /** 리포트 최상단 배치. Big Five/정신건강 검사/사용자 메모를 종합한 한 줄 별명 + 2~3줄 설명 */
+  psychNickname: PsychNickname | null;
+  /** "AI가 보는 한 줄" — 리포트 전체에서 가장 중요하게 본 통찰 한 문장(리포트 마지막) */
+  keyInsightLine: string | null;
+  /** quote-bank.ts 후보의 id만 담는다 — 실제 텍스트는 프론트가 아니라 API가 id로 조회해 채운다.
+   *  ReportDto.dailyQuote(계산된 필드)로 노출되며, 프론트는 이 원본 id 필드를 직접 쓰지 않는다. */
+  dailyQuoteId: string | null;
 }
 
 /** 이모지는 여기 라벨(고정 UI)에만 붙인다 — LLM이 생성하는 본문 서술에는 넣지 않아 임상적 어조를 유지한다. */
-export const AI_REPORT_SECTION_LABELS: Record<keyof Omit<AIReportSections, 'claimsConfidence' | 'funMbtiGuess'>, string> = {
+export const AI_REPORT_SECTION_LABELS: Record<
+  keyof Omit<AIReportSections, 'claimsConfidence' | 'funMbtiGuess' | 'psychNickname' | 'keyInsightLine' | 'dailyQuoteId'>,
+  string
+> = {
   overallSummary: '📝 전체 요약',
   personalityProfile: '🎨 성격 프로파일',
   currentMentalHealthStatus: '🧠 현재 정신건강 상태',
@@ -121,4 +131,19 @@ export interface FunMbtiGuess {
   topCandidates: MbtiCandidate[];
   reasoning: string;
   confidence: ConfidenceLevel;
+}
+
+/** 리포트 최상단의 "당신의 심리 별명" 보너스 콘텐츠 */
+export interface PsychNickname {
+  nickname: string;
+  explanation: string;
+}
+
+/**
+ * "오늘 당신을 위한 명언"의 표시용 형태 — API가 dailyQuoteId를 검증된 명언 목록에서 조회해
+ * 만든 계산된 값이다(ReportDto.dailyQuote). 텍스트는 항상 quote-bank.ts의 고정 데이터에서만 온다.
+ */
+export interface DailyQuote {
+  quote: string;
+  author: string;
 }

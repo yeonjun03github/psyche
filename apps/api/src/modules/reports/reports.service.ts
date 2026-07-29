@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CurrentUserService } from '../../common/current-user/current-user.service';
 import { PersonModelBuilderService } from '../integration/person-model-builder.service';
 import { diffPersonModels, toPersonModelDiffInput, type PersonModelDiff } from '../integration/domain/person-model-diff';
+import { findQuoteById } from './ai/quote-bank';
 import { REPORT_GENERATION_QUEUE } from './queue/report-generation.queue';
 import type { ReportGenerationJobData } from './queue/report-generation.processor';
 import type { CreateReportDto } from './dto/create-report.dto';
@@ -56,13 +57,16 @@ export class ReportsService {
   }
 
   /**
-   * 완료된 리포트라면 이전 PersonModel과의 순수 수치 비교를 즉석 계산해 얹는다.
-   * 두 PersonModel은 불변 스냅샷이라 매번 계산해도 결과가 같으므로 DB에 저장하지 않는다.
+   * 완료된 리포트라면 이전 PersonModel과의 순수 수치 비교와, 저장된 dailyQuoteId에 대응하는
+   * 검증된 명언 텍스트를 즉석 계산해 얹는다. 둘 다 기존 데이터(불변 PersonModel 스냅샷, 고정
+   * quote-bank.ts)에서 항상 같은 결과로 재계산 가능해 DB에 중복 저장하지 않는다.
    */
   async findOne(id: string) {
     const report = await this.findOwned(id);
     const comparisonSummary = await this.computeComparisonSummary(report.status, report.personModelId);
-    return { ...report, comparisonSummary };
+    const quoteEntry = report.sections?.dailyQuoteId ? findQuoteById(report.sections.dailyQuoteId) : undefined;
+    const dailyQuote = quoteEntry ? { quote: quoteEntry.quote, author: quoteEntry.author } : null;
+    return { ...report, comparisonSummary, dailyQuote };
   }
 
   private async computeComparisonSummary(

@@ -1,4 +1,4 @@
-import type { AIReportSections, ClaimSectionKey, FeedbackVerdict, SectionFeedback } from '@psyche/shared';
+import type { AIReportSections, ClaimSectionKey, DailyQuote, FeedbackVerdict, SectionFeedback } from '@psyche/shared';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 
@@ -104,6 +104,8 @@ export interface ReportDto {
   feedback: SectionFeedback[];
   /** findOne(상세 조회)에서만 즉석 계산되어 채워진다 — 목록 조회에는 없다 */
   comparisonSummary?: ComparisonSummary | null;
+  /** findOne(상세 조회)에서만 dailyQuoteId를 검증된 명언 목록으로 조회해 채워진다 */
+  dailyQuote?: DailyQuote | null;
   failureReason: string | null;
   createdAt: string;
   completedAt: string | null;

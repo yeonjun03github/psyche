@@ -8,6 +8,9 @@ import { ConfidenceBadge } from './confidence-badge';
 import { FeedbackControls } from './feedback-controls';
 import { ScoreDeltaTable } from './score-delta-table';
 import { FunMbtiSection } from './fun-mbti-section';
+import { PsychNicknameSection } from './psych-nickname-section';
+import { KeyInsightLine } from './key-insight-line';
+import { DailyQuoteSection } from './daily-quote-section';
 
 const CLAIM_SECTION_SET: Set<string> = new Set(CLAIM_SECTION_KEYS);
 
@@ -68,6 +71,8 @@ export function ReportDetailClient({ id }: { id: string }) {
             본 리포트는 의학적 진단이 아니며 전문가 상담을 대체하지 않습니다.
           </p>
 
+          {report.sections.psychNickname && <PsychNicknameSection nickname={report.sections.psychNickname} />}
+
           {report.context && (
             <p className="rounded-md border border-neutral-200 p-3 text-xs text-neutral-500 dark:border-neutral-800">
               이 리포트를 생성할 때 남긴 참고 메모: “{report.context}”
@@ -104,6 +109,10 @@ export function ReportDetailClient({ id }: { id: string }) {
               </section>
             );
           })}
+
+          {report.sections.keyInsightLine && <KeyInsightLine line={report.sections.keyInsightLine} />}
+
+          {report.dailyQuote && <DailyQuoteSection quote={report.dailyQuote} />}
 
           {report.sections.funMbtiGuess && <FunMbtiSection guess={report.sections.funMbtiGuess} />}
         </>
