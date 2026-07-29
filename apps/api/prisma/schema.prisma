@@ -228,6 +228,20 @@ type SectionFeedback {
   updatedAt DateTime
 }
 
+type MbtiCandidate {
+  type       String // 16개 MBTI 유형 중 하나 — 유효성 검증은 report-schema.ts(zod enum)의 몫
+  percentage Int
+}
+
+/// 프로젝트의 핵심 분석이 아닌 보너스 이스터에그. Big Five(IPIP-50) 등 기존 심리검사 결과를
+/// AI가 MBTI 관점으로 재해석한 참고용 추정일 뿐, 실제 MBTI 검사를 수행하지 않는다.
+/// CLAIM_SECTION_KEYS/claimsConfidence와 별개로 자체 confidence를 갖는다(피드백 대상 아님).
+type FunMbtiGuess {
+  topCandidates MbtiCandidate[]
+  reasoning     String
+  confidence    ConfidenceLevel
+}
+
 type ReportSections {
   overallSummary              String
   personalityProfile          String
@@ -251,6 +265,10 @@ type ReportSections {
   areasToWatch         String?
   // --- 확신도 메타데이터 (해석적 서브셋만, CLAIM_SECTION_KEYS 참고) ---
   claimsConfidence ClaimConfidence[]
+  // --- 재미 보너스 (핵심 분석 아님) ---
+  // optional인 이유: 이 필드가 생기기 전에 저장된 기존 리포트 문서에는 없는 필드라, required로
+  // 두면 그 문서들을 읽을 때(findMany 등) Prisma가 역직렬화에 실패해 전체 조회가 깨진다.
+  funMbtiGuess FunMbtiGuess?
 }
 
 model AIReport {

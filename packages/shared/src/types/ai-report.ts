@@ -25,9 +25,12 @@ export interface AIReportSections {
   unchangedAreas: string | null;
   areasToWatch: string | null;
   claimsConfidence: ClaimConfidence[];
+  /** 프로젝트 핵심 분석이 아닌 보너스 이스터에그 — 실제 MBTI 검사가 아니라 AI의 참고용 재해석.
+   *  이 필드가 생기기 전에 만들어진 기존 리포트는 null이다. */
+  funMbtiGuess: FunMbtiGuess | null;
 }
 
-export const AI_REPORT_SECTION_LABELS: Record<keyof Omit<AIReportSections, 'claimsConfidence'>, string> = {
+export const AI_REPORT_SECTION_LABELS: Record<keyof Omit<AIReportSections, 'claimsConfidence' | 'funMbtiGuess'>, string> = {
   overallSummary: '전체 요약',
   personalityProfile: '성격 프로파일',
   currentMentalHealthStatus: '현재 정신건강 상태',
@@ -91,4 +94,30 @@ export interface SectionFeedback {
   verdict: FeedbackVerdict;
   note: string | null;
   updatedAt: string;
+}
+
+export const MBTI_TYPES = [
+  'INTJ', 'INTP', 'ENTJ', 'ENTP',
+  'INFJ', 'INFP', 'ENFJ', 'ENFP',
+  'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
+  'ISTP', 'ISFP', 'ESTP', 'ESFP',
+] as const;
+
+export type MbtiType = (typeof MBTI_TYPES)[number];
+
+export interface MbtiCandidate {
+  type: MbtiType;
+  percentage: number;
+}
+
+/**
+ * 재미 보너스 이스터에그. 실제 MBTI 검사를 수행하지 않으며, Big Five(IPIP-50) 등 기존 심리검사
+ * 결과를 AI가 MBTI 관점으로 재해석한 참고용 추정일 뿐이다. 하나로 단정하지 않도록 항상
+ * top 3 후보를 제시하고, claimsConfidence/CLAIM_SECTION_KEYS와는 별개로 자체 confidence를 갖는다
+ * (핵심 해석이 아니므로 사용자 피드백 대상에도 포함하지 않는다).
+ */
+export interface FunMbtiGuess {
+  topCandidates: MbtiCandidate[];
+  reasoning: string;
+  confidence: ConfidenceLevel;
 }

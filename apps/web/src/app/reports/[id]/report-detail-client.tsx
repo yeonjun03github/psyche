@@ -7,6 +7,7 @@ import { api, type ReportDto } from '@/lib/api';
 import { ConfidenceBadge } from './confidence-badge';
 import { FeedbackControls } from './feedback-controls';
 import { ScoreDeltaTable } from './score-delta-table';
+import { FunMbtiSection } from './fun-mbti-section';
 
 const CLAIM_SECTION_SET: Set<string> = new Set(CLAIM_SECTION_KEYS);
 
@@ -103,6 +104,8 @@ export function ReportDetailClient({ id }: { id: string }) {
               </section>
             );
           })}
+
+          {report.sections.funMbtiGuess && <FunMbtiSection guess={report.sections.funMbtiGuess} />}
         </>
       )}
     </main>

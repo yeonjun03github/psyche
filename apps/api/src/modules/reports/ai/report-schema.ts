@@ -1,11 +1,23 @@
 import { z } from 'zod';
-import { CLAIM_SECTION_KEYS } from '@psyche/shared';
+import { CLAIM_SECTION_KEYS, MBTI_TYPES } from '@psyche/shared';
 
 const claimConfidenceSchema = z.object({
   section: z.enum(CLAIM_SECTION_KEYS),
   confidence: z.enum(['HIGH', 'MEDIUM', 'LOW']),
   evidence: z.array(z.string()), // 근거로 삼은 testCode들 — confidence가 낮으면 비어있을 수 있음
   reason: z.string().nullable(), // nullable(optional 아님): OpenAI strict 모드가 모든 키를 required로 요구
+});
+
+const mbtiCandidateSchema = z.object({
+  type: z.enum(MBTI_TYPES),
+  percentage: z.number().min(0).max(100),
+});
+
+/** 재미 보너스 이스터에그 — 항상 서로 다른 유형 3개를 제시해 하나로 단정하지 않도록 강제한다. */
+const funMbtiGuessSchema = z.object({
+  topCandidates: z.array(mbtiCandidateSchema).length(3),
+  reasoning: z.string().min(1),
+  confidence: z.enum(['HIGH', 'MEDIUM', 'LOW']),
 });
 
 /**
@@ -34,6 +46,7 @@ export const reportSectionsSchema = z.object({
   unchangedAreas: z.string().nullable(),
   areasToWatch: z.string().nullable(),
   claimsConfidence: z.array(claimConfidenceSchema),
+  funMbtiGuess: funMbtiGuessSchema,
 });
 
 export type ReportSections = z.infer<typeof reportSectionsSchema>;
