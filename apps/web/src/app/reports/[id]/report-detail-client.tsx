@@ -86,7 +86,7 @@ export function ReportDetailClient({ id }: { id: string }) {
             return (
               <section key={key}>
                 <h2 className="mb-1 text-sm font-semibold text-neutral-500">{AI_REPORT_SECTION_LABELS[key]}</h2>
-                <p className="leading-relaxed">{value}</p>
+                <p className="whitespace-pre-line leading-relaxed">{value}</p>
                 {confidence && (
                   <ConfidenceBadge
                     confidence={confidence.confidence}

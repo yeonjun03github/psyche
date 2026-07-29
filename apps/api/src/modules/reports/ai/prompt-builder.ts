@@ -39,7 +39,7 @@ export interface BuiltPrompt {
  * 생성됐는지 추적한다(재현성). 프롬프트 텍스트나 섹션 구성이 바뀔 때만 값을 올린다 — 스키마
  * 버전을 따로 두지 않는 이유는 둘이 항상 같이 바뀌기 때문(불필요한 중복 카운터 방지).
  */
-export const PROMPT_VERSION = '5';
+export const PROMPT_VERSION = '6';
 
 /** 이 5개는 이전 리포트가 없으면 반드시 null이어야 하는 종단 비교 섹션이다. */
 const LONGITUDINAL_SECTION_KEYS = new Set([
@@ -72,8 +72,10 @@ const SECTION_GUIDANCE: Record<string, string> = {
   aggravatingFactors:
     '아직 벌어지지 않았거나 더 커질 수 있는 잠재적 위험 요인만 다룬다. 이미 작동 중인 maintainingFactors와 겹치지 않도록, "앞으로 나빠질 수 있는 조건"에 집중한다.',
   highestLeverageChangeFactor: '여러 개선 방향 중 가장 파급력이 큰 단 하나만 짚는다. 구체적이고 오늘 시도해볼 수 있는 수준으로 쓴다 — "스트레스를 관리하세요" 같은 추상적 조언은 피한다.',
-  priorityIssues: 'primaryConcern을 포함해 해결 우선순위 목록을 만든다. 각 항목은 한 줄로, 왜 그 순서인지만 짧게 덧붙인다.',
-  improvementRoadmap: 'priorityIssues를 실제로 무엇을, 어떤 순서로 실행할지 구체적 행동 계획으로 쓴다. highestLeverageChangeFactor를 어떻게 실천할지 포함한다.',
+  priorityIssues:
+    'primaryConcern을 포함해 해결 우선순위 목록을 만든다. 각 항목은 "1. 내용"처럼 번호를 붙이고, 항목 사이에 실제 줄바꿈(\\n)을 넣어 한 줄에 하나씩 쓴다 — 모든 항목을 한 문단으로 이어붙이지 않는다. 왜 그 순서인지만 짧게 덧붙인다.',
+  improvementRoadmap:
+    'priorityIssues를 실제로 무엇을, 어떤 순서로 실행할지 구체적 행동 계획으로 쓴다. highestLeverageChangeFactor를 어떻게 실천할지 포함한다. 단계별로 "1단계: 내용"처럼 번호를 붙이고, 단계 사이에 실제 줄바꿈(\\n)을 넣어 한 줄에 하나씩 쓴다.',
   metricsToTrack: '검사명을 그대로 반복하지 말고, 일상에서 스스로 체감할 수 있는 구체적 신호로 표현한다.',
   recommendedRetestTiming: '재검사 시점과 그 근거를 한두 문장으로만.',
   changesSincePrevious: '이전 리포트 대비 전체적인 변화의 흐름만 요약한다.',
@@ -134,7 +136,9 @@ claimsConfidence.evidence 필드에서만 사용하십시오.
    악화/개선 등)에서만 언급하고, 최소 하나 이상의 새로운 통찰을 더하십시오. 읽는 사람이 "다음
    섹션을 읽을 이유"가 있어야 합니다.
 7. 문장은 짧고 명확하게 쓰십시오. 한 문장에 가설을 3~4개씩 겹쳐 넣지 마십시오. 심리학 전문
-   용어보다 사용자가 이해할 수 있는 말로 풀어 쓰되, 전문성은 유지하십시오.
+   용어보다 사용자가 이해할 수 있는 말로 풀어 쓰되, 전문성은 유지하십시오. priorityIssues,
+   improvementRoadmap처럼 번호를 매겨 나열하는 항목은 항목 사이에 실제 줄바꿈(\n)을 넣어 한
+   줄에 하나씩 쓰십시오 — 모든 항목을 한 문단으로 이어붙이면 가독성이 떨어집니다.
 8. 모든 문장은 한국어로, 사용자가 자기 자신을 더 잘 이해하도록 돕는 것을 목표로 작성하십시오.
 9. 아래 섹션을 모두, 지정된 스키마의 필드 이름 그대로 채워야 합니다.
 10. 사용자가 남긴 참고 메모(사용자 메모)가 주어지면, 이는 검증된 사실이 아니라 참고 정보입니다.

@@ -30,26 +30,27 @@ export interface AIReportSections {
   funMbtiGuess: FunMbtiGuess | null;
 }
 
+/** 이모지는 여기 라벨(고정 UI)에만 붙인다 — LLM이 생성하는 본문 서술에는 넣지 않아 임상적 어조를 유지한다. */
 export const AI_REPORT_SECTION_LABELS: Record<keyof Omit<AIReportSections, 'claimsConfidence' | 'funMbtiGuess'>, string> = {
-  overallSummary: '전체 요약',
-  personalityProfile: '성격 프로파일',
-  currentMentalHealthStatus: '현재 정신건강 상태',
-  primaryConcern: '현재 가장 큰 문제',
-  primaryStrength: '현재 가장 큰 강점',
-  crossTestCorrelations: '검사 결과 간 연관성',
-  possibleCausalHypotheses: '왜 이런 결과가 나왔을 가능성이 있는가',
-  maintainingFactors: '현재 상태를 유지시키는 요인',
-  aggravatingFactors: '현재 상태를 악화시키는 요인',
-  highestLeverageChangeFactor: '개선 가능성이 가장 높은 요소',
-  priorityIssues: '우선적으로 해결해야 할 문제',
-  improvementRoadmap: '개선 로드맵',
-  metricsToTrack: '향후 추적하면 좋은 지표',
-  recommendedRetestTiming: '재검사를 추천하는 시점',
-  changesSincePrevious: '이전 리포트 이후 변화',
-  improvedAreas: '개선된 영역',
-  worsenedAreas: '악화된 영역',
-  unchangedAreas: '변화가 거의 없는 영역',
-  areasToWatch: '앞으로 주의 깊게 볼 영역',
+  overallSummary: '📝 전체 요약',
+  personalityProfile: '🎨 성격 프로파일',
+  currentMentalHealthStatus: '🧠 현재 정신건강 상태',
+  primaryConcern: '⚠️ 현재 가장 큰 문제',
+  primaryStrength: '💪 현재 가장 큰 강점',
+  crossTestCorrelations: '🔗 검사 결과 간 연관성',
+  possibleCausalHypotheses: '🔍 왜 이런 결과가 나왔을 가능성이 있는가',
+  maintainingFactors: '🔄 현재 상태를 유지시키는 요인',
+  aggravatingFactors: '⚡ 현재 상태를 악화시키는 요인',
+  highestLeverageChangeFactor: '🔑 개선 가능성이 가장 높은 요소',
+  priorityIssues: '🎯 우선적으로 해결해야 할 문제',
+  improvementRoadmap: '🗺️ 개선 로드맵',
+  metricsToTrack: '📊 향후 추적하면 좋은 지표',
+  recommendedRetestTiming: '📅 재검사를 추천하는 시점',
+  changesSincePrevious: '📈 이전 리포트 이후 변화',
+  improvedAreas: '🌱 개선된 영역',
+  worsenedAreas: '📉 악화된 영역',
+  unchangedAreas: '➖ 변화가 거의 없는 영역',
+  areasToWatch: '👀 앞으로 주의 깊게 볼 영역',
 };
 
 /**
