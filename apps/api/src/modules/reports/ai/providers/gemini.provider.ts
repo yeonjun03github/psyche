@@ -5,12 +5,14 @@ import type { AIGenerationRequest, AIProvider } from '../ai-provider.interface';
 @Injectable()
 export class GeminiProvider implements AIProvider {
   readonly name = 'gemini';
+  readonly modelId: string;
   private readonly client: GoogleGenAI;
   private readonly model: string;
 
   constructor(apiKey: string, model: string) {
     this.client = new GoogleGenAI({ apiKey });
     this.model = model;
+    this.modelId = model;
   }
 
   async generateJson(request: AIGenerationRequest): Promise<unknown> {

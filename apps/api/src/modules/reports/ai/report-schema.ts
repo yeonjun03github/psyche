@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import { CLAIM_SECTION_KEYS } from '@psyche/shared';
+
+const claimConfidenceSchema = z.object({
+  section: z.enum(CLAIM_SECTION_KEYS),
+  confidence: z.enum(['HIGH', 'MEDIUM', 'LOW']),
+  evidence: z.array(z.string()), // 근거로 삼은 testCode들 — confidence가 낮으면 비어있을 수 있음
+  reason: z.string().nullable(), // nullable(optional 아님): OpenAI strict 모드가 모든 키를 required로 요구
+});
 
 /**
  * packages/shared/src/types/ai-report.ts의 AIReportSections와 1:1 대응된다.
@@ -19,6 +27,13 @@ export const reportSectionsSchema = z.object({
   improvementRoadmap: z.string().min(1),
   metricsToTrack: z.string().min(1),
   recommendedRetestTiming: z.string().min(1),
+  // 이전 PersonModel이 없으면(첫 리포트) 5개 전부 null이어야 한다 — processor에서 방어적으로도 강제한다.
+  changesSincePrevious: z.string().nullable(),
+  improvedAreas: z.string().nullable(),
+  worsenedAreas: z.string().nullable(),
+  unchangedAreas: z.string().nullable(),
+  areasToWatch: z.string().nullable(),
+  claimsConfidence: z.array(claimConfidenceSchema),
 });
 
 export type ReportSections = z.infer<typeof reportSectionsSchema>;

@@ -11,6 +11,7 @@ export function CreateReportButton() {
   const [step, setStep] = useState<Step>('idle');
   const [preview, setPreview] = useState<ReportPreviewDto | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [context, setContext] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   async function handleOpenPreview() {
@@ -30,7 +31,10 @@ export function CreateReportButton() {
   async function handleConfirm() {
     setStep('creating');
     try {
-      const report = await api.createReport(preview?.requiresConfirmation ? acknowledged : undefined);
+      const report = await api.createReport({
+        acknowledgeDateSpanWarning: preview?.requiresConfirmation ? acknowledged : undefined,
+        context: context.trim() || undefined,
+      });
       router.push(`/reports/${report.id}`);
     } catch (e) {
       setError((e as Error).message);
@@ -79,6 +83,20 @@ export function CreateReportButton() {
             </li>
           ))}
         </ul>
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-medium">
+          참고 메모 <span className="font-normal text-neutral-500">(선택, 다음 리포트에 재사용되지 않습니다)</span>
+        </label>
+        <textarea
+          value={context}
+          onChange={(e) => setContext(e.target.value)}
+          maxLength={500}
+          rows={3}
+          placeholder="예: 최근 이직 준비 중, 시험 기간, 가족 갈등, 수면 문제 등"
+          className="w-full rounded-lg border border-neutral-200 p-2 text-sm dark:border-neutral-800 dark:bg-neutral-950"
+        />
       </div>
 
       {preview.requiresConfirmation && (

@@ -1,4 +1,4 @@
-import type { AIReportSections } from '@psyche/shared';
+import type { AIReportSections, ClaimSectionKey, FeedbackVerdict, SectionFeedback } from '@psyche/shared';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 
@@ -81,10 +81,29 @@ export interface SaveAnswerResult {
   message: string | null;
 }
 
+export interface TestDiff {
+  testCode: string;
+  previousNormalizedScore: number | null;
+  currentNormalizedScore: number | null;
+  delta: number | null;
+  previousBand: string | null;
+  currentBand: string | null;
+  subscaleDiffs: { name: string; previousNormalizedScore: number; currentNormalizedScore: number; delta: number }[];
+}
+
+export interface ComparisonSummary {
+  daysSincePrevious: number;
+  testDiffs: TestDiff[];
+}
+
 export interface ReportDto {
   id: string;
   status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  context: string | null;
   sections: AIReportSections | null;
+  feedback: SectionFeedback[];
+  /** findOne(상세 조회)에서만 즉석 계산되어 채워진다 — 목록 조회에는 없다 */
+  comparisonSummary?: ComparisonSummary | null;
   failureReason: string | null;
   createdAt: string;
   completedAt: string | null;
@@ -129,9 +148,11 @@ export const api = {
       { method: 'POST' },
     ),
   getReportPreview: () => request<ReportPreviewDto>('/reports/preview'),
-  createReport: (acknowledgeDateSpanWarning?: boolean) =>
-    request<ReportDto>('/reports', { method: 'POST', body: JSON.stringify({ acknowledgeDateSpanWarning }) }),
+  createReport: (payload: { acknowledgeDateSpanWarning?: boolean; context?: string }) =>
+    request<ReportDto>('/reports', { method: 'POST', body: JSON.stringify(payload) }),
   getReport: (id: string) => request<ReportDto>(`/reports/${id}`),
   getReports: () => request<ReportDto[]>('/reports'),
   deleteReport: (id: string) => request<void>(`/reports/${id}`, { method: 'DELETE' }),
+  submitReportFeedback: (reportId: string, payload: { section: ClaimSectionKey; verdict: FeedbackVerdict; note?: string }) =>
+    request<ReportDto>(`/reports/${reportId}/feedback`, { method: 'PATCH', body: JSON.stringify(payload) }),
 };

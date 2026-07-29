@@ -2,8 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AI_REPORT_SECTION_LABELS, type AIReportSections } from '@psyche/shared';
+import { AI_REPORT_SECTION_LABELS, CLAIM_SECTION_KEYS, type ClaimSectionKey } from '@psyche/shared';
 import { api, type ReportDto } from '@/lib/api';
+import { ConfidenceBadge } from './confidence-badge';
+import { FeedbackControls } from './feedback-controls';
+import { ScoreDeltaTable } from './score-delta-table';
+
+const CLAIM_SECTION_SET: Set<string> = new Set(CLAIM_SECTION_KEYS);
 
 export function ReportDetailClient({ id }: { id: string }) {
   const [report, setReport] = useState<ReportDto | null>(null);
@@ -61,12 +66,43 @@ export function ReportDetailClient({ id }: { id: string }) {
           <p className="rounded-md bg-neutral-100 p-3 text-xs text-neutral-500 dark:bg-neutral-900">
             본 리포트는 의학적 진단이 아니며 전문가 상담을 대체하지 않습니다.
           </p>
-          {(Object.keys(AI_REPORT_SECTION_LABELS) as (keyof AIReportSections)[]).map((key) => (
-            <section key={key}>
-              <h2 className="mb-1 text-sm font-semibold text-neutral-500">{AI_REPORT_SECTION_LABELS[key]}</h2>
-              <p className="leading-relaxed">{report.sections![key]}</p>
-            </section>
-          ))}
+
+          {report.context && (
+            <p className="rounded-md border border-neutral-200 p-3 text-xs text-neutral-500 dark:border-neutral-800">
+              이 리포트를 생성할 때 남긴 참고 메모: “{report.context}”
+            </p>
+          )}
+
+          {report.comparisonSummary && <ScoreDeltaTable summary={report.comparisonSummary} />}
+
+          {(Object.keys(AI_REPORT_SECTION_LABELS) as (keyof typeof AI_REPORT_SECTION_LABELS)[]).map((key) => {
+            const value = report.sections![key];
+            if (value == null) return null; // 종단 비교 섹션은 이전 리포트가 없으면 null
+
+            const confidence = report.sections!.claimsConfidence.find((c) => c.section === key);
+            const isClaimSection = CLAIM_SECTION_SET.has(key);
+
+            return (
+              <section key={key}>
+                <h2 className="mb-1 text-sm font-semibold text-neutral-500">{AI_REPORT_SECTION_LABELS[key]}</h2>
+                <p className="leading-relaxed">{value}</p>
+                {confidence && (
+                  <ConfidenceBadge
+                    confidence={confidence.confidence}
+                    evidence={confidence.evidence}
+                    reason={confidence.reason}
+                  />
+                )}
+                {isClaimSection && (
+                  <FeedbackControls
+                    reportId={report.id}
+                    section={key as ClaimSectionKey}
+                    existing={report.feedback.find((f) => f.section === key) ?? null}
+                  />
+                )}
+              </section>
+            );
+          })}
         </>
       )}
     </main>

@@ -5,12 +5,14 @@ import type { AIGenerationRequest, AIProvider } from '../ai-provider.interface';
 @Injectable()
 export class GroqProvider implements AIProvider {
   readonly name = 'groq';
+  readonly modelId: string;
   private readonly client: Groq;
   private readonly model: string;
 
   constructor(apiKey: string, model: string) {
     this.client = new Groq({ apiKey });
     this.model = model;
+    this.modelId = model;
   }
 
   async generateJson(request: AIGenerationRequest): Promise<unknown> {

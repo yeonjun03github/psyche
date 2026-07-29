@@ -13,6 +13,8 @@ export interface AIGenerationRequest {
 
 export interface AIProvider {
   readonly name: string;
+  /** 실제 모델 식별자(예: gemini-flash-latest) — 리포트 재현성을 위해 AIReport.aiModel에 기록된다. */
+  readonly modelId: string;
   /** 스키마를 만족하는 JSON을 반환한다. 파싱된 값의 zod 검증은 호출자(report-schema.ts)의 책임이다. */
   generateJson(request: AIGenerationRequest): Promise<unknown>;
 }

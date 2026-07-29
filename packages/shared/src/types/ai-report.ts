@@ -18,9 +18,16 @@ export interface AIReportSections {
   improvementRoadmap: string;
   metricsToTrack: string;
   recommendedRetestTiming: string;
+  /** 이전 리포트(PersonModel)가 없으면 5개 전부 null */
+  changesSincePrevious: string | null;
+  improvedAreas: string | null;
+  worsenedAreas: string | null;
+  unchangedAreas: string | null;
+  areasToWatch: string | null;
+  claimsConfidence: ClaimConfidence[];
 }
 
-export const AI_REPORT_SECTION_LABELS: Record<keyof AIReportSections, string> = {
+export const AI_REPORT_SECTION_LABELS: Record<keyof Omit<AIReportSections, 'claimsConfidence'>, string> = {
   overallSummary: '전체 요약',
   personalityProfile: '성격 프로파일',
   currentMentalHealthStatus: '현재 정신건강 상태',
@@ -35,4 +42,53 @@ export const AI_REPORT_SECTION_LABELS: Record<keyof AIReportSections, string> = 
   improvementRoadmap: '개선 로드맵',
   metricsToTrack: '향후 추적하면 좋은 지표',
   recommendedRetestTiming: '재검사를 추천하는 시점',
+  changesSincePrevious: '이전 리포트 이후 변화',
+  improvedAreas: '개선된 영역',
+  worsenedAreas: '악화된 영역',
+  unchangedAreas: '변화가 거의 없는 영역',
+  areasToWatch: '앞으로 주의 깊게 볼 영역',
 };
+
+/**
+ * "확신도(claimsConfidence)"와 사용자 피드백 대상을 이 서브셋으로 제한한다 — 절차적/권고성
+ * 섹션(priorityIssues, improvementRoadmap, metricsToTrack, recommendedRetestTiming)은
+ * "얼마나 확신하는가"를 물을 대상이 아니라서 제외한다.
+ */
+export const CLAIM_SECTION_KEYS = [
+  'personalityProfile',
+  'currentMentalHealthStatus',
+  'primaryConcern',
+  'primaryStrength',
+  'crossTestCorrelations',
+  'possibleCausalHypotheses',
+  'maintainingFactors',
+  'aggravatingFactors',
+  'highestLeverageChangeFactor',
+  'changesSincePrevious',
+  'improvedAreas',
+  'worsenedAreas',
+  'unchangedAreas',
+  'areasToWatch',
+] as const;
+
+export type ClaimSectionKey = (typeof CLAIM_SECTION_KEYS)[number];
+
+export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+
+/** LLM 자신이 해당 섹션 서술에 대해 갖는 확신도 — evidence는 근거 testCode들, reason은 낮은 확신도의 이유 */
+export interface ClaimConfidence {
+  section: ClaimSectionKey;
+  confidence: ConfidenceLevel;
+  evidence: string[];
+  reason: string | null;
+}
+
+export type FeedbackVerdict = 'CONFIRMED' | 'PARTIALLY_CONFIRMED' | 'REJECTED';
+
+/** 사용자가 특정 섹션(해석적 주장)에 남긴 반응 — 사실이 아니라 참고 정보 */
+export interface SectionFeedback {
+  section: ClaimSectionKey;
+  verdict: FeedbackVerdict;
+  note: string | null;
+  updatedAt: string;
+}

@@ -5,12 +5,14 @@ import type { AIGenerationRequest, AIProvider } from '../ai-provider.interface';
 @Injectable()
 export class OpenAIProvider implements AIProvider {
   readonly name = 'openai';
+  readonly modelId: string;
   private readonly client: OpenAI;
   private readonly model: string;
 
   constructor(apiKey: string, model: string) {
     this.client = new OpenAI({ apiKey });
     this.model = model;
+    this.modelId = model;
   }
 
   async generateJson(request: AIGenerationRequest): Promise<unknown> {

@@ -28,6 +28,7 @@ const logger = new Logger('AiModule');
           logger.warn(`AIProvider를 초기화하지 못했습니다: ${message} (리포트 생성 시도 시에만 실패합니다)`);
           return {
             name: 'unconfigured',
+            modelId: 'unconfigured',
             generateJson() {
               return Promise.reject(new Error(message));
             },

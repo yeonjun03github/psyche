@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { CreateReportDto } from './dto/create-report.dto';
+import { UpsertFeedbackDto } from './dto/upsert-feedback.dto';
 
 @ApiTags('reports')
 @Controller('reports')
@@ -16,7 +17,7 @@ export class ReportsController {
 
   @Post()
   create(@Body() dto: CreateReportDto) {
-    return this.reportsService.create(dto.acknowledgeDateSpanWarning);
+    return this.reportsService.create(dto);
   }
 
   @Get()
@@ -27,6 +28,11 @@ export class ReportsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.reportsService.findOne(id);
+  }
+
+  @Patch(':id/feedback')
+  upsertFeedback(@Param('id') id: string, @Body() dto: UpsertFeedbackDto) {
+    return this.reportsService.upsertFeedback(id, dto);
   }
 
   @Delete(':id')

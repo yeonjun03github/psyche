@@ -198,6 +198,36 @@ enum ReportStatus {
   FAILED
 }
 
+enum ConfidenceLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum FeedbackVerdict {
+  CONFIRMED
+  PARTIALLY_CONFIRMED
+  REJECTED
+}
+
+/// 해석적 주장 하나에 대한 LLM 자신의 확신도 메타데이터. sections의 서술 문자열 자체는 바꾸지 않고
+/// "어느 섹션이 얼마나 확실한 근거로 쓰였는가"를 병렬 배열로 기술한다 (CLAIM_SECTION_KEYS 대상만).
+type ClaimConfidence {
+  section    String
+  confidence ConfidenceLevel
+  evidence   String[] // 근거로 삼은 testCode들 — confidence가 낮으면 비어있을 수 있음
+  reason     String?  // confidence가 LOW/MEDIUM일 때 왜 확신이 낮은지
+}
+
+/// 사용자가 리포트의 특정 섹션(해석적 주장)에 남긴 반응. 사실로 취급하지 않고,
+/// 다음 리포트 생성 시 참고 정보로만 LLM에 전달된다 (feedback-summary.ts가 누적 집계).
+type SectionFeedback {
+  section   String
+  verdict   FeedbackVerdict
+  note      String?
+  updatedAt DateTime
+}
+
 type ReportSections {
   overallSummary              String
   personalityProfile          String
@@ -213,19 +243,30 @@ type ReportSections {
   improvementRoadmap                     String
   metricsToTrack                          String
   recommendedRetestTiming                  String
+  // --- 종단 비교 (previousPersonModelId가 없으면 전부 null) ---
+  changesSincePrevious String?
+  improvedAreas        String?
+  worsenedAreas        String?
+  unchangedAreas       String?
+  areasToWatch         String?
+  // --- 확신도 메타데이터 (해석적 서브셋만, CLAIM_SECTION_KEYS 참고) ---
+  claimsConfidence ClaimConfidence[]
 }
 
 model AIReport {
-  id            String          @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String          @db.ObjectId
-  personModelId String          @db.ObjectId
-  status        ReportStatus    @default(PENDING)
-  model         String?
-  promptVersion String?
+  id            String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String            @db.ObjectId
+  personModelId String            @db.ObjectId
+  status        ReportStatus      @default(PENDING)
+  aiProvider    String? // 벤더 이름 (gemini/openai/groq) — 기존 `model` 필드를 의미가 분명하도록 개명
+  aiModel       String? // 실제 모델 식별자 (예: gemini-flash-latest) — 재현성을 위해 신규 기록
+  promptVersion String? // 프롬프트+스키마 계약의 버전 — 신규로 실제 값을 채워 넣음
+  context       String? // 리포트 생성 시 사용자가 남긴 참고 메모(사실 아님, 다음 리포트에 재사용 안 함)
   sections      ReportSections?
-  pdfFileId     String?         @db.ObjectId
+  feedback      SectionFeedback[]
+  pdfFileId     String?           @db.ObjectId
   failureReason String?
-  createdAt     DateTime        @default(now())
+  createdAt     DateTime          @default(now())
   completedAt   DateTime?
 
   @@index([userId])
