@@ -15,9 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 버전은 package.json의 "packageManager" 필드(pnpm@9.15.0)에서 자동으로 읽는다 —
+      # 여기서 다시 지정하면 "Multiple versions of pnpm specified" 에러로 액션 자체가 실패한다.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
