@@ -13,7 +13,21 @@
 
 - Node.js ≥ 20
 - pnpm 9 (`corepack enable` 하면 `packageManager` 필드로 자동 설치됨)
-- Docker Desktop (MongoDB replica set + Redis 구동용)
+- Docker Desktop (Redis 구동용)
+- MongoDB Atlas 계정 및 클러스터 (아래 참고)
+
+## MongoDB Atlas
+
+이 프로젝트는 로컬 MongoDB 대신 [Atlas](https://www.mongodb.com/cloud/atlas/register)를 사용합니다(무료 M0 티어로 충분).
+
+1. Atlas에서 클러스터 생성(M0) → Database Access에서 사용자 생성 → Network Access에 접속을 허용할 IP 추가(배포 환경에서 접속하려면 `0.0.0.0/0` 필요)
+2. 클러스터의 "Connect → Drivers"에서 연결 문자열을 복사
+3. 문자열에 데이터베이스 이름을 추가해 `apps/api/.env`의 `DATABASE_URL`에 채워 넣습니다:
+   ```
+   mongodb+srv://<user>:<password>@<cluster-host>/psyche?appName=Cluster0
+   ```
+
+Atlas는 M0부터 이미 replica set으로 동작하므로, 로컬 Docker Mongo에서 필요했던 별도의 replica set 초기화 과정이 필요 없습니다.
 
 ## 최초 설정
 
@@ -31,19 +45,21 @@
    cp .env.example apps/api/.env
    ```
 
+   `DATABASE_URL`은 본인의 MongoDB Atlas 클러스터 연결 문자열로 채워야 합니다(아래 "MongoDB Atlas" 참고).
+
    `apps/web/.env.local`에는 아래 한 줄만 있으면 됩니다.
 
    ```
    NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api/v1
    ```
 
-3. MongoDB / Redis 기동 (Docker)
+3. Redis 기동 (Docker)
 
    ```bash
    docker compose -f docker/docker-compose.yml up -d
    ```
 
-   Prisma는 트랜잭션/change stream 때문에 MongoDB replica set을 요구합니다. `mongo-init` 컨테이너가 최초 기동 시 `rs0`을 자동으로 초기화합니다.
+   MongoDB는 로컬 컨테이너가 아니라 Atlas를 사용하므로(아래 참고), 이 컴포즈 파일은 Redis(BullMQ 큐용)만 기동합니다.
 
 4. Prisma 클라이언트 생성 및 스키마 반영
 
@@ -104,10 +120,10 @@ pnpm --filter @psyche/web dev
 |---|---|
 | Web (Next.js) | 3000 |
 | API (NestJS) | 4000 (기본값, `.env`의 `PORT`로 변경 가능) |
-| MongoDB | 27017 |
+| MongoDB | Atlas(클라우드) |
 | Redis | 6379 |
 
 ## 트러블슈팅
 
-- **Prisma가 트랜잭션/replica set 오류를 내는 경우**: `docker compose -f docker/docker-compose.yml ps`로 `mongo-init` 컨테이너가 정상 종료(exit 0)됐는지 확인하세요. 재초기화가 필요하면 `docker compose -f docker/docker-compose.yml down -v` 후 다시 `up -d` 합니다 (볼륨이 삭제되어 데이터가 초기화되니 주의).
+- **`DATABASE_URL` 관련 연결 오류가 나는 경우**: Atlas의 Network Access에 현재 접속 환경의 IP(또는 `0.0.0.0/0`)가 허용되어 있는지, `DATABASE_URL`에 데이터베이스 이름(`/psyche`)이 빠지지 않았는지 확인하세요.
 - **로그인/시드 계정이 안 보이는 경우**: `.env`의 `ADMIN_EMAIL`/`ADMIN_PASSWORD` 값과 `pnpm --filter @psyche/api prisma:seed` 실행 여부를 확인하세요.
