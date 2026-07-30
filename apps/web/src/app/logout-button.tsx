@@ -12,7 +12,7 @@ export function LogoutButton() {
   }
 
   return (
-    <button onClick={handleLogout} className="text-sm text-neutral-500 underline">
+    <button onClick={handleLogout} className="shrink-0 whitespace-nowrap text-sm text-neutral-500 underline">
       로그아웃
     </button>
   );

@@ -63,7 +63,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-8">
+    <main className="mx-auto flex max-w-sm flex-col gap-6 p-8 pt-16">
       <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onLoad={handleGoogleScriptLoad} />
 
       <header>

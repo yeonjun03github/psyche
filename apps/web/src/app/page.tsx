@@ -40,8 +40,8 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex max-w-2xl flex-1 flex-col gap-8 p-8">
-      <header className="flex items-start justify-between">
-        <div>
+      <header className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold">Psyche</h1>
           <p className="mt-1 text-sm text-neutral-500">
             여러 심리검사 결과를 AI가 통합 해석하는 심리 리포트 플랫폼
