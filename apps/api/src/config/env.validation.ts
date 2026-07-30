@@ -9,6 +9,8 @@ export const envSchema = z.object({
 
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
+  // 로컬 Docker Redis는 비밀번호가 없지만, Railway 등 매니지드 Redis는 필요하다.
+  REDIS_PASSWORD: z.string().optional(),
 
   JWT_ACCESS_SECRET: z.string().min(1, 'JWT_ACCESS_SECRET is required'),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
