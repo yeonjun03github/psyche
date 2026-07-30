@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { api, type SessionDto } from '@/lib/api';
+import { cookies } from 'next/headers';
+import { api, isRedirectError, type SessionDto } from '@/lib/api';
+import { ACCESS_TOKEN_COOKIE } from '@/lib/auth-constants';
 
 function ResultCard({ session }: { session: SessionDto }) {
   if (session.subscaleScores.length > 0) {
@@ -31,9 +33,13 @@ function ResultCard({ session }: { session: SessionDto }) {
 
 export default async function TestIntroPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
+  const token = (await cookies()).get(ACCESS_TOKEN_COOKIE)?.value;
   const [test, sessions] = await Promise.all([
-    api.getTest(code).catch(() => null),
-    api.getSessions(),
+    api.getTest(code, token).catch((e) => {
+      if (isRedirectError(e)) throw e;
+      return null;
+    }),
+    api.getSessions(token),
   ]);
   if (!test) notFound();
 

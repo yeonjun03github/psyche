@@ -17,6 +17,10 @@ export const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(1, 'JWT_REFRESH_SECRET is required'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
+  // Google Cloud Console에서 발급받은 OAuth 2.0 클라이언트 ID (Web application).
+  // ID 토큰 검증에만 쓰이며, 클라이언트 시크릿은 필요 없다(프론트가 GIS로 받은 idToken을 그대로 검증).
+  GOOGLE_CLIENT_ID: z.string().min(1, 'GOOGLE_CLIENT_ID is required'),
+
   // 특정 벤더에 종속되지 않도록 AI_PROVIDER 하나로 Gemini/OpenAI/Groq 중 사용할 Provider를 고른다.
   AI_PROVIDER: z.enum(['gemini', 'openai', 'groq']).default('gemini'),
 
@@ -33,7 +37,7 @@ export const envSchema = z.object({
 
   FILE_STORAGE_ROOT: z.string().default('./storage'),
 
-  // 개인용 도구이므로 공개 회원가입이 없다 — 유일한 계정을 시드 스크립트로 생성한다(9절 Auth 참고).
+  // 시드 스크립트가 생성하는 유일한 비밀번호 로그인 계정(관리자). 일반 사용자는 Google 로그인으로 가입한다.
   ADMIN_EMAIL: z.string().email().default('me@psyche.local'),
   ADMIN_PASSWORD: z.string().min(8).default('changeme123!'),
   ADMIN_NAME: z.string().default('Owner'),

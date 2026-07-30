@@ -1,7 +1,10 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { api } from '@/lib/api';
+import { ACCESS_TOKEN_COOKIE } from '@/lib/auth-constants';
 import { ResetProgressButton } from './reset-progress-button';
 import { ResetAllButton } from './reset-all-button';
+import { LogoutButton } from './logout-button';
 
 /**
  * 대시보드에 보여줄 대표 세션을 고른다. ABANDONED는 "무효화된 시도"라 대표로 삼지 않는다 —
@@ -19,10 +22,11 @@ function representativeSessionByCode(sessions: Awaited<ReturnType<typeof api.get
 }
 
 export default async function Home() {
+  const token = (await cookies()).get(ACCESS_TOKEN_COOKIE)?.value;
   const [tests, sessions, reports] = await Promise.all([
-    api.getTests(),
-    api.getSessions(),
-    api.getReports(),
+    api.getTests(token),
+    api.getSessions(token),
+    api.getReports(token),
   ]);
 
   const essentialTests = tests.filter((t) => t.category === 'ESSENTIAL');
@@ -36,11 +40,14 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex max-w-2xl flex-1 flex-col gap-8 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold">Psyche</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          여러 심리검사 결과를 AI가 통합 해석하는 심리 리포트 플랫폼
-        </p>
+      <header className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Psyche</h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            여러 심리검사 결과를 AI가 통합 해석하는 심리 리포트 플랫폼
+          </p>
+        </div>
+        <LogoutButton />
       </header>
 
       <section>

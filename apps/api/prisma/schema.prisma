@@ -10,11 +10,20 @@ datasource db {
 
 // ==================== User ====================
 
+enum Role {
+  ADMIN
+  USER
+}
+
 model User {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   email        String   @unique
-  passwordHash String
+  /// Google 로그인 전용 사용자는 비밀번호가 없다.
+  passwordHash String?
+  /// Google 계정으로 가입/연동한 경우에만 채워진다.
+  googleId     String?  @unique
   name         String
+  role         Role     @default(USER)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
