@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
+import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
+import type { EnvConfig } from '../../config/env.validation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CurrentUserService } from '../../common/current-user/current-user.service';
 import { PersonModelBuilderService } from '../integration/person-model-builder.service';
@@ -17,6 +19,7 @@ export class ReportsService {
     private readonly prisma: PrismaService,
     private readonly currentUser: CurrentUserService,
     private readonly personModelBuilder: PersonModelBuilderService,
+    private readonly config: ConfigService<EnvConfig, true>,
     @InjectQueue(REPORT_GENERATION_QUEUE) private readonly queue: Queue<ReportGenerationJobData>,
   ) {}
 
@@ -28,6 +31,11 @@ export class ReportsService {
 
   async create(dto: CreateReportDto) {
     const userId = await this.currentUser.getUserId();
+    const role = await this.currentUser.getRole();
+    if (role !== 'ADMIN') {
+      await this.enforceCreationCooldown(userId);
+    }
+
     // 서버가 다시 검증한다 — 필수 7종 미완료거나 날짜 간격 경고를 확인하지 않았으면 예외를 던진다.
     const personModel = await this.personModelBuilder.build(userId, {
       acknowledgeDateSpanWarning: dto.acknowledgeDateSpanWarning,
@@ -44,6 +52,23 @@ export class ReportsService {
     );
 
     return report;
+  }
+
+  /** ADMIN이 아닌 사용자가 리포트 생성을 연타해 AI 호출 비용이 새는 것을 막는다. */
+  private async enforceCreationCooldown(userId: string): Promise<void> {
+    const cooldownMinutes = this.config.get('REPORT_CREATION_COOLDOWN_MINUTES', { infer: true });
+    const cutoff = new Date(Date.now() - cooldownMinutes * 60_000);
+
+    const recent = await this.prisma.aIReport.findFirst({
+      where: { userId, createdAt: { gte: cutoff } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!recent) return;
+
+    const retryAfterMinutes = Math.ceil((recent.createdAt.getTime() + cooldownMinutes * 60_000 - Date.now()) / 60_000);
+    throw new BadRequestException(
+      `리포트는 ${cooldownMinutes}분에 한 번만 생성할 수 있습니다. ${retryAfterMinutes}분 후 다시 시도해주세요.`,
+    );
   }
 
   /** 소유권 검증 포함 — 다른 서비스 메서드들이 이 메서드로 존재/소유 여부를 확인한다. */

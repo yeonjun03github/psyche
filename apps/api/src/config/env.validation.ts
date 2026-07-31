@@ -41,6 +41,9 @@ export const envSchema = z.object({
   ADMIN_EMAIL: z.string().email().default('me@psyche.local'),
   ADMIN_PASSWORD: z.string().min(8).default('changeme123!'),
   ADMIN_NAME: z.string().default('Owner'),
+
+  // 일반 사용자가 리포트 생성을 연타해 AI 호출 비용이 새는 것을 막는 쿨다운. ADMIN 역할은 예외.
+  REPORT_CREATION_COOLDOWN_MINUTES: z.coerce.number().int().positive().default(10),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

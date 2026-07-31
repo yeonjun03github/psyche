@@ -2,6 +2,7 @@ import { Inject, Injectable, Scope, UnauthorizedException } from '@nestjs/common
 import { REQUEST } from '@nestjs/core';
 import type { Request } from 'express';
 import type { AccessTokenPayload } from '../../modules/auth/guards/jwt-auth.guard';
+import type { Role } from '../../generated/prisma';
 
 /**
  * 요청 스코프(REQUEST)로 동작한다 — JwtAuthGuard(전역)가 request.user에 채워 넣은
@@ -17,5 +18,12 @@ export class CurrentUserService {
       throw new UnauthorizedException('인증이 필요합니다.');
     }
     return this.request.user.sub;
+  }
+
+  async getRole(): Promise<Role> {
+    if (!this.request.user) {
+      throw new UnauthorizedException('인증이 필요합니다.');
+    }
+    return this.request.user.role;
   }
 }
