@@ -324,3 +324,25 @@ model PdfFile {
 
   @@map("pdf_files")
 }
+
+// ==================== ReportChatMessage ====================
+// 리포트 상세 화면에서 텍스트를 드래그 선택해 던지는 후속 질문 스레드. 하나의 AIReport에
+// 종속되며, AI 응답은 매 호출마다 그 리포트의 sections/testScores 전체를 다시 읽어 맥락으로
+// 삼는다(별도로 리포트 요약을 중복 저장하지 않는다).
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+model ReportChatMessage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  reportId  String   @db.ObjectId
+  userId    String   @db.ObjectId
+  role      ChatRole
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([reportId, createdAt])
+  @@map("report_chat_messages")
+}

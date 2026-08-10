@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import type { AIReportSections, ClaimSectionKey, DailyQuote, FeedbackVerdict, SectionFeedback } from '@psyche/shared';
+import type { AIReportSections, ClaimSectionKey, DailyQuote, FeedbackVerdict, ReportChatMessage, SectionFeedback } from '@psyche/shared';
 import { ACCESS_TOKEN_COOKIE } from './auth-constants';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
@@ -209,4 +209,7 @@ export const api = {
   deleteReport: (id: string) => request<void>(`/reports/${id}`, { method: 'DELETE' }),
   submitReportFeedback: (reportId: string, payload: { section: ClaimSectionKey; verdict: FeedbackVerdict; note?: string }) =>
     request<ReportDto>(`/reports/${reportId}/feedback`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  getReportChat: (reportId: string) => request<ReportChatMessage[]>(`/reports/${reportId}/chat`),
+  sendReportChatMessage: (reportId: string, message: string) =>
+    request<ReportChatMessage[]>(`/reports/${reportId}/chat`, { method: 'POST', body: JSON.stringify({ message }) }),
 };

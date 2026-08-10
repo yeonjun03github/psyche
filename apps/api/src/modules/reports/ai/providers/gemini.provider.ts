@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { GoogleGenAI } from '@google/genai';
-import type { AIGenerationRequest, AIProvider } from '../ai-provider.interface';
+import type { AIGenerationRequest, AIProvider, AITextGenerationRequest } from '../ai-provider.interface';
 
 @Injectable()
 export class GeminiProvider implements AIProvider {
@@ -31,5 +31,22 @@ export class GeminiProvider implements AIProvider {
       throw new InternalServerErrorException('Gemini 응답에서 텍스트를 받지 못했습니다.');
     }
     return JSON.parse(text);
+  }
+
+  async generateText(request: AITextGenerationRequest): Promise<string> {
+    const response = await this.client.models.generateContent({
+      model: this.model,
+      contents: request.messages.map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      })),
+      config: { systemInstruction: request.systemPrompt },
+    });
+
+    const text = response.text;
+    if (!text) {
+      throw new InternalServerErrorException('Gemini 응답에서 텍스트를 받지 못했습니다.');
+    }
+    return text;
   }
 }

@@ -11,12 +11,25 @@ export interface AIGenerationRequest {
   schemaName: string;
 }
 
+export interface AIChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AITextGenerationRequest {
+  systemPrompt: string;
+  /** 대화 히스토리 전체(직전 사용자 메시지 포함) — 벤더별 role 표기로 변환하는 것은 각 provider의 책임. */
+  messages: AIChatMessage[];
+}
+
 export interface AIProvider {
   readonly name: string;
   /** 실제 모델 식별자(예: gemini-flash-latest) — 리포트 재현성을 위해 AIReport.aiModel에 기록된다. */
   readonly modelId: string;
   /** 스키마를 만족하는 JSON을 반환한다. 파싱된 값의 zod 검증은 호출자(report-schema.ts)의 책임이다. */
   generateJson(request: AIGenerationRequest): Promise<unknown>;
+  /** 자유 형식 텍스트 응답을 반환한다 — 리포트 채팅처럼 스키마가 필요 없는 멀티턴 대화용. */
+  generateText(request: AITextGenerationRequest): Promise<string>;
 }
 
 export const AI_PROVIDER = Symbol('AI_PROVIDER');

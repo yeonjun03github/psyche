@@ -32,6 +32,9 @@ const logger = new Logger('AiModule');
             generateJson() {
               return Promise.reject(new Error(message));
             },
+            generateText() {
+              return Promise.reject(new Error(message));
+            },
           };
         }
       },

@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import OpenAI from 'openai';
-import type { AIGenerationRequest, AIProvider } from '../ai-provider.interface';
+import type { AIGenerationRequest, AIProvider, AITextGenerationRequest } from '../ai-provider.interface';
 
 @Injectable()
 export class OpenAIProvider implements AIProvider {
@@ -33,5 +33,21 @@ export class OpenAIProvider implements AIProvider {
       throw new InternalServerErrorException('OpenAI 응답에서 내용을 받지 못했습니다.');
     }
     return JSON.parse(content);
+  }
+
+  async generateText(request: AITextGenerationRequest): Promise<string> {
+    const completion = await this.client.chat.completions.create({
+      model: this.model,
+      messages: [
+        { role: 'system', content: request.systemPrompt },
+        ...request.messages.map((m) => ({ role: m.role, content: m.content }) as const),
+      ],
+    });
+
+    const content = completion.choices[0]?.message.content;
+    if (!content) {
+      throw new InternalServerErrorException('OpenAI 응답에서 내용을 받지 못했습니다.');
+    }
+    return content;
   }
 }

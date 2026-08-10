@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpsertFeedbackDto } from './dto/upsert-feedback.dto';
+import { SendChatMessageDto } from './dto/send-chat-message.dto';
 
 @ApiTags('reports')
 @Controller('reports')
@@ -39,5 +40,15 @@ export class ReportsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string) {
     await this.reportsService.remove(id);
+  }
+
+  @Get(':id/chat')
+  listChat(@Param('id') id: string) {
+    return this.reportsService.listChatMessages(id);
+  }
+
+  @Post(':id/chat')
+  sendChat(@Param('id') id: string, @Body() dto: SendChatMessageDto) {
+    return this.reportsService.sendChatMessage(id, dto);
   }
 }

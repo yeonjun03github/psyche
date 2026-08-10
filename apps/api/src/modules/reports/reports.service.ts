@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
@@ -13,12 +13,18 @@ import {
   type PersonModelSnapshot,
 } from '../integration/domain/person-model-diff';
 import { findQuoteById } from './ai/quote-bank';
+import { AI_PROVIDER, type AIProvider } from './ai/ai-provider.interface';
+import { buildChatSystemPrompt } from './ai/chat-prompt-builder';
 import { REPORT_GENERATION_QUEUE } from './queue/report-generation.queue';
 import type { ReportGenerationJobData } from './queue/report-generation.processor';
 import type { CreateReportDto } from './dto/create-report.dto';
 import type { UpsertFeedbackDto } from './dto/upsert-feedback.dto';
+import type { SendChatMessageDto } from './dto/send-chat-message.dto';
 
 type PersonModelWithPrevious = PersonModelSnapshot & { metadata: { previousPersonModelId: string | null } };
+
+/** 리포트 하나당 채팅 스레드가 무한정 길어져 AI 호출 비용이 새는 것을 막는다. */
+const MAX_CHAT_MESSAGES_PER_REPORT = 60;
 
 @Injectable()
 export class ReportsService {
@@ -28,6 +34,7 @@ export class ReportsService {
     private readonly personModelBuilder: PersonModelBuilderService,
     private readonly config: ConfigService<EnvConfig, true>,
     @InjectQueue(REPORT_GENERATION_QUEUE) private readonly queue: Queue<ReportGenerationJobData>,
+    @Inject(AI_PROVIDER) private readonly aiProvider: AIProvider,
   ) {}
 
   /** 어떤 검사의 어떤 응시 결과로 리포트가 만들어질지 미리 보여준다(생성 전 확인용). */
@@ -162,6 +169,55 @@ export class ReportsService {
   async remove(id: string) {
     // findOwned가 소유권 검증까지 해준다 — 여기서 다시 조회해 존재/소유 여부를 확인한다.
     await this.findOwned(id);
+    await this.prisma.reportChatMessage.deleteMany({ where: { reportId: id } });
     await this.prisma.aIReport.delete({ where: { id } });
+  }
+
+  /** 리포트 상세 화면에서 드래그 선택 → "질문하기"로 시작하는 후속 질문 스레드. */
+  async listChatMessages(id: string) {
+    await this.findOwned(id);
+    return this.prisma.reportChatMessage.findMany({ where: { reportId: id }, orderBy: { createdAt: 'asc' } });
+  }
+
+  async sendChatMessage(id: string, dto: SendChatMessageDto) {
+    const userId = await this.currentUser.getUserId();
+    const report = await this.findOwned(id);
+    if (report.status !== 'COMPLETED' || !report.sections) {
+      throw new BadRequestException('완료된 리포트에만 질문할 수 있습니다.');
+    }
+
+    const messageCount = await this.prisma.reportChatMessage.count({ where: { reportId: id } });
+    if (messageCount >= MAX_CHAT_MESSAGES_PER_REPORT) {
+      throw new BadRequestException('이 리포트의 대화가 너무 길어졌습니다. 새 리포트를 생성한 뒤 다시 질문해주세요.');
+    }
+
+    const personModel = await this.prisma.personModel.findUnique({ where: { id: report.personModelId } });
+    const testScores = personModel ? await this.buildTestScores(personModel) : [];
+
+    const userMessage = await this.prisma.reportChatMessage.create({
+      data: { reportId: id, userId, role: 'USER', content: dto.message },
+    });
+
+    const history = await this.prisma.reportChatMessage.findMany({
+      where: { reportId: id },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const systemPrompt = buildChatSystemPrompt({
+      testScores,
+      sections: report.sections,
+      reportContext: report.context,
+    });
+
+    const reply = await this.aiProvider.generateText({
+      systemPrompt,
+      messages: history.map((m) => ({ role: m.role === 'ASSISTANT' ? 'assistant' : 'user', content: m.content })),
+    });
+
+    const assistantMessage = await this.prisma.reportChatMessage.create({
+      data: { reportId: id, userId, role: 'ASSISTANT', content: reply },
+    });
+
+    return [userMessage, assistantMessage];
   }
 }
