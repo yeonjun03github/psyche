@@ -16,10 +16,18 @@ export function ReportChatPanel({
   const [messages, setMessages] = useState<ReportChatMessage[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [input, setInput] = useState(initialMessage);
+  // 렌더 중에 prop 변화를 감지해 state를 조정하는 React 권장 패턴 — 이걸 useEffect에서
+  // setState로 하면 커밋 후 리렌더가 한 번 더 발생해 eslint(react-hooks)가 금지한다.
+  const [appliedQuote, setAppliedQuote] = useState(initialMessage);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  if (initialMessage !== appliedQuote) {
+    setAppliedQuote(initialMessage);
+    setInput(initialMessage);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -39,9 +47,9 @@ export function ReportChatPanel({
     };
   }, [reportId]);
 
-  // 새로 드래그해서 넘어온 인용문마다 입력창에 프리필하고 전체 선택(하이라이트) 상태로 포커스한다.
+  // 새로 드래그해서 넘어온 인용문마다 입력창을 전체 선택(하이라이트)한 채로 포커스한다 —
+  // 이 effect는 DOM에 직접 손대는 순수 부수효과만 하고 setState는 하지 않는다(위 참고).
   useEffect(() => {
-    setInput(initialMessage);
     const el = textareaRef.current;
     if (el && initialMessage) {
       el.focus();
