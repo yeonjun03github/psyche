@@ -6,12 +6,19 @@ import type { EnvConfig } from '../../config/env.validation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CurrentUserService } from '../../common/current-user/current-user.service';
 import { PersonModelBuilderService } from '../integration/person-model-builder.service';
-import { diffPersonModels, toPersonModelDiffInput, type PersonModelDiff } from '../integration/domain/person-model-diff';
+import {
+  diffPersonModels,
+  toPersonModelDiffInput,
+  type PersonModelDiff,
+  type PersonModelSnapshot,
+} from '../integration/domain/person-model-diff';
 import { findQuoteById } from './ai/quote-bank';
 import { REPORT_GENERATION_QUEUE } from './queue/report-generation.queue';
 import type { ReportGenerationJobData } from './queue/report-generation.processor';
 import type { CreateReportDto } from './dto/create-report.dto';
 import type { UpsertFeedbackDto } from './dto/upsert-feedback.dto';
+
+type PersonModelWithPrevious = PersonModelSnapshot & { metadata: { previousPersonModelId: string | null } };
 
 @Injectable()
 export class ReportsService {
@@ -85,24 +92,48 @@ export class ReportsService {
    * 완료된 리포트라면 이전 PersonModel과의 순수 수치 비교와, 저장된 dailyQuoteId에 대응하는
    * 검증된 명언 텍스트를 즉석 계산해 얹는다. 둘 다 기존 데이터(불변 PersonModel 스냅샷, 고정
    * quote-bank.ts)에서 항상 같은 결과로 재계산 가능해 DB에 중복 저장하지 않는다.
+   * testScores(실제 검사 점수)도 같은 이유로 저장하지 않고 매번 PersonModel에서 계산한다 —
+   * AI 서술은 점수를 본문에 나열하지 않도록 지시받아서, 원 점수는 여기서 별도로 노출한다.
    */
   async findOne(id: string) {
     const report = await this.findOwned(id);
-    const comparisonSummary = await this.computeComparisonSummary(report.status, report.personModelId);
+    const personModel = await this.prisma.personModel.findUnique({ where: { id: report.personModelId } });
+    const testScores = personModel ? await this.buildTestScores(personModel) : [];
+    const comparisonSummary = await this.computeComparisonSummary(report.status, personModel);
     const quoteEntry = report.sections?.dailyQuoteId ? findQuoteById(report.sections.dailyQuoteId) : undefined;
     const dailyQuote = quoteEntry ? { quote: quoteEntry.quote, author: quoteEntry.author } : null;
-    return { ...report, comparisonSummary, dailyQuote };
+    return { ...report, testScores, comparisonSummary, dailyQuote };
+  }
+
+  private async buildTestScores(personModel: {
+    testResults: {
+      testCode: string;
+      normalizedScore: number | null;
+      band: string | null;
+      subscaleScores: { name: string; normalizedScore: number; band: string }[];
+    }[];
+  }) {
+    const codes = personModel.testResults.map((t) => t.testCode);
+    const definitions = await this.prisma.testDefinition.findMany({ where: { code: { in: codes } } });
+    const nameByCode = new Map(definitions.map((d) => [d.code, d.name]));
+
+    return personModel.testResults.map((t) => ({
+      testCode: t.testCode,
+      testName: nameByCode.get(t.testCode) ?? t.testCode,
+      normalizedScore: t.normalizedScore,
+      band: t.band,
+      subscaleScores: t.subscaleScores.map((s) => ({ name: s.name, normalizedScore: s.normalizedScore, band: s.band })),
+    }));
   }
 
   private async computeComparisonSummary(
     status: string,
-    personModelId: string,
+    personModel: PersonModelWithPrevious | null,
   ): Promise<PersonModelDiff | null> {
-    if (status !== 'COMPLETED') return null;
+    if (status !== 'COMPLETED' || !personModel) return null;
 
-    const personModel = await this.prisma.personModel.findUnique({ where: { id: personModelId } });
-    const previousId = personModel?.metadata.previousPersonModelId;
-    if (!personModel || !previousId) return null;
+    const previousId = personModel.metadata.previousPersonModelId;
+    if (!previousId) return null;
 
     const previous = await this.prisma.personModel.findUnique({ where: { id: previousId } });
     if (!previous) return null;

@@ -7,6 +7,7 @@ import { api, type ReportDto } from '@/lib/api';
 import { ConfidenceBadge } from './confidence-badge';
 import { FeedbackControls } from './feedback-controls';
 import { ScoreDeltaTable } from './score-delta-table';
+import { TestScoresTable } from './test-scores-table';
 import { FunMbtiSection } from './fun-mbti-section';
 import { PsychNicknameSection } from './psych-nickname-section';
 import { KeyInsightLine } from './key-insight-line';
@@ -78,6 +79,8 @@ export function ReportDetailClient({ id }: { id: string }) {
               이 리포트를 생성할 때 남긴 참고 메모: “{report.context}”
             </p>
           )}
+
+          {report.testScores && report.testScores.length > 0 && <TestScoresTable items={report.testScores} />}
 
           {report.comparisonSummary && <ScoreDeltaTable summary={report.comparisonSummary} />}
 

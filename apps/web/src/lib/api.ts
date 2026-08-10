@@ -135,12 +135,23 @@ export interface ComparisonSummary {
   testDiffs: TestDiff[];
 }
 
+export interface TestScoreItem {
+  testCode: string;
+  testName: string;
+  normalizedScore: number | null;
+  band: string | null;
+  subscaleScores: { name: string; normalizedScore: number; band: string }[];
+}
+
 export interface ReportDto {
   id: string;
   status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
   context: string | null;
   sections: AIReportSections | null;
   feedback: SectionFeedback[];
+  /** findOne(상세 조회)에서만 채워진다 — 목록 조회에는 없다. 리포트 서술은 점수를 본문에 나열하지
+   *  않도록 지시받아서, 실제 검사 점수는 여기서 별도로 노출한다. */
+  testScores?: TestScoreItem[];
   /** findOne(상세 조회)에서만 즉석 계산되어 채워진다 — 목록 조회에는 없다 */
   comparisonSummary?: ComparisonSummary | null;
   /** findOne(상세 조회)에서만 dailyQuoteId를 검증된 명언 목록으로 조회해 채워진다 */
