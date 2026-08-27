@@ -16,6 +16,7 @@ const logger = new Logger('AiModule');
             AI_PROVIDER: config.get('AI_PROVIDER', { infer: true }),
             GEMINI_API_KEY: config.get('GEMINI_API_KEY', { infer: true }),
             GEMINI_MODEL: config.get('GEMINI_MODEL', { infer: true }),
+            GEMINI_FALLBACK_MODEL: config.get('GEMINI_FALLBACK_MODEL', { infer: true }),
             OPENAI_API_KEY: config.get('OPENAI_API_KEY', { infer: true }),
             OPENAI_MODEL: config.get('OPENAI_MODEL', { infer: true }),
             GROQ_API_KEY: config.get('GROQ_API_KEY', { infer: true }),

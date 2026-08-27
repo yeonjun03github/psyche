@@ -6,6 +6,7 @@ import { GroqProvider } from './providers/groq.provider';
 describe('createAIProvider', () => {
   const base = {
     GEMINI_MODEL: 'gemini-2.5-flash',
+    GEMINI_FALLBACK_MODEL: 'gemini-flash-lite-latest',
     OPENAI_MODEL: 'gpt-4.1',
     GROQ_MODEL: 'openai/gpt-oss-120b',
   };

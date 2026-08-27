@@ -28,6 +28,9 @@ export const envSchema = z.object({
   // 특정 모델 버전이 아니라 별칭(alias)을 기본값으로 둔다 — 특정 버전은 예고 없이
   // 신규 사용자에게 서비스 종료될 수 있음을 실제로 겪었다(gemini-2.5-flash 404).
   GEMINI_MODEL: z.string().default('gemini-flash-latest'),
+  // GEMINI_MODEL이 일시적으로 "high demand"(503)면 이 모델로 즉시 한 번 더 시도한다 — 실제로
+  // 겪어보니 같은 순간에도 lite 모델은 멀쩡했다. BullMQ 재시도(수십 초)보다 훨씬 빠르게 복구된다.
+  GEMINI_FALLBACK_MODEL: z.string().default('gemini-flash-lite-latest'),
 
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default('gpt-4.1'),

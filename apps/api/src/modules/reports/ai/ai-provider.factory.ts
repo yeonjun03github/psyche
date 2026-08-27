@@ -7,6 +7,8 @@ export interface AiProviderEnv {
   AI_PROVIDER: 'gemini' | 'openai' | 'groq';
   GEMINI_API_KEY?: string;
   GEMINI_MODEL: string;
+  /** 주 모델이 일시적으로 "high demand"(503)면 이 모델로 즉시 한 번 더 시도한다. */
+  GEMINI_FALLBACK_MODEL: string;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL: string;
   GROQ_API_KEY?: string;
@@ -35,7 +37,7 @@ export function createAIProvider(env: AiProviderEnv): AIProvider {
       if (!env.GEMINI_API_KEY) {
         throw new Error('AI_PROVIDER=gemini 인데 GEMINI_API_KEY가 설정되어 있지 않습니다.');
       }
-      return new GeminiProvider(env.GEMINI_API_KEY, env.GEMINI_MODEL);
+      return new GeminiProvider(env.GEMINI_API_KEY, env.GEMINI_MODEL, env.GEMINI_FALLBACK_MODEL);
     }
   }
 }

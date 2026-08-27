@@ -22,6 +22,15 @@ const CONTEXT_DEPENDENT_KEYS = ['reportedSituation', 'possibleRelevance'] as con
 
 type PersonModelWithPrevious = PersonModelSnapshot & { metadata: { previousPersonModelId: string | null } };
 
+/** 사용자에게 그대로 노출되는 필드라, 벤더 SDK가 던지는 원본 JSON 에러 문자열을 그대로 저장하지 않는다. */
+function formatFailureReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/503|UNAVAILABLE|high demand/i.test(message)) {
+    return 'AI 모델이 일시적으로 혼잡합니다(자동 대체 모델까지 실패). 잠시 후 다시 시도해주세요.';
+  }
+  return message;
+}
+
 @Processor(REPORT_GENERATION_QUEUE)
 export class ReportGenerationProcessor extends WorkerHost {
   constructor(
@@ -115,7 +124,7 @@ export class ReportGenerationProcessor extends WorkerHost {
       if (isLastAttempt) {
         await this.prisma.aIReport.update({
           where: { id: report.id },
-          data: { status: 'FAILED', failureReason: (error as Error).message },
+          data: { status: 'FAILED', failureReason: formatFailureReason(error) },
         });
       }
       throw error;

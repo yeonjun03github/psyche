@@ -73,8 +73,10 @@ export class ReportsService {
     const cooldownMinutes = this.config.get('REPORT_CREATION_COOLDOWN_MINUTES', { infer: true });
     const cutoff = new Date(Date.now() - cooldownMinutes * 60_000);
 
+    // FAILED는 카운트하지 않는다 — AI 쪽 일시 장애(예: 모델 high demand)로 실패한 시도까지
+    // 쿨다운에 묶이면, 정작 재시도가 필요한 사용자가 그 시간만큼 더 기다려야 하는 역효과가 난다.
     const recent = await this.prisma.aIReport.findFirst({
-      where: { userId, createdAt: { gte: cutoff } },
+      where: { userId, createdAt: { gte: cutoff }, status: { not: 'FAILED' } },
       orderBy: { createdAt: 'desc' },
     });
     if (!recent) return;
