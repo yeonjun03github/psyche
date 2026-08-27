@@ -14,6 +14,7 @@ import { TestDefinitionsModule } from './modules/test-definitions/test-definitio
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { IntegrationModule } from './modules/integration/integration.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     SessionsModule,
     IntegrationModule,
     ReportsModule,
+    AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

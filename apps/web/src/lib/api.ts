@@ -179,6 +179,24 @@ export interface ReportPreviewDto {
   requiresConfirmation: boolean;
 }
 
+export interface AdminReportStats {
+  totalReports: number;
+  byStatus: { status: string; count: number }[];
+  successRate: number | null;
+  averageDurationSeconds: number | null;
+  minDurationSeconds: number | null;
+  maxDurationSeconds: number | null;
+  byModel: { aiProvider: string; aiModel: string; count: number; averageDurationSeconds: number | null }[];
+  recentFailures: {
+    id: string;
+    userId: string;
+    failureReason: string | null;
+    aiProvider: string | null;
+    aiModel: string | null;
+    createdAt: string;
+  }[];
+}
+
 export const api = {
   // 서버 컴포넌트(page.tsx)에서 호출할 때만 두 번째 인자로 next/headers의 cookies()에서 읽은
   // 토큰을 넘긴다 — 클라이언트 컴포넌트는 생략하면 request()가 document.cookie에서 알아서 읽는다.
@@ -212,4 +230,5 @@ export const api = {
   getReportChat: (reportId: string) => request<ReportChatMessage[]>(`/reports/${reportId}/chat`),
   sendReportChatMessage: (reportId: string, message: string) =>
     request<ReportChatMessage[]>(`/reports/${reportId}/chat`, { method: 'POST', body: JSON.stringify({ message }) }),
+  getAdminReportStats: (token?: string) => request<AdminReportStats>('/admin/report-stats', undefined, token),
 };

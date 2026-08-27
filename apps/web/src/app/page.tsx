@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { api } from '@/lib/api';
 import { ACCESS_TOKEN_COOKIE } from '@/lib/auth-constants';
+import { decodeAccessTokenRole } from '@/lib/jwt';
 import { ResetProgressButton } from './reset-progress-button';
 import { ResetAllButton } from './reset-all-button';
 import { LogoutButton } from './logout-button';
@@ -23,6 +24,7 @@ function representativeSessionByCode(sessions: Awaited<ReturnType<typeof api.get
 
 export default async function Home() {
   const token = (await cookies()).get(ACCESS_TOKEN_COOKIE)?.value;
+  const isAdmin = decodeAccessTokenRole(token) === 'ADMIN';
   const [tests, sessions, reports] = await Promise.all([
     api.getTests(token),
     api.getSessions(token),
@@ -47,7 +49,14 @@ export default async function Home() {
             여러 심리검사 결과를 AI가 통합 해석하는 심리 리포트 플랫폼
           </p>
         </div>
-        <LogoutButton />
+        <div className="flex shrink-0 items-center gap-3">
+          {isAdmin && (
+            <Link href="/admin" className="whitespace-nowrap text-sm text-neutral-500 underline">
+              관리자
+            </Link>
+          )}
+          <LogoutButton />
+        </div>
       </header>
 
       <section>
