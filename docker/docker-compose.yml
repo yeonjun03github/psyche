@@ -1,8 +1,35 @@
 name: psyche
 
-# MongoDB는 STEP 2(MongoDB Atlas 전환)부터 로컬 컨테이너 대신 Atlas 클러스터를 사용한다.
-# 로컬에는 Redis(BullMQ 큐용)만 기동하면 된다.
+# 온라인(Vercel+Railway+Atlas)과 로컬 실행을 둘 다 지원한다 — 어느 한쪽이 안 되어도(무료 크레딧
+# 만료 등) 다른 쪽 동작에 영향을 주지 않는다. DATABASE_URL/REDIS_HOST 등 환경변수로만 어느 쪽을
+# 쓸지 결정되며, 코드는 어느 쪽인지 알 필요가 없다. 완전 로컬로 띄우려면 mongo/redis 둘 다 이
+# compose로 올리고 .env.example의 로컬 DATABASE_URL 예시를 쓰면 된다 — Google 로그인/Gemini AI만
+# 인터넷 연결이 필요하고(성격상 어쩔 수 없음), 그 외 기능은 전부 오프라인으로 동작한다.
 services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: mongosh --quiet --eval "db.adminCommand('ping')"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mongo-init:
+    image: mongo:7
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: >
+      mongosh --host mongo:27017 --quiet --eval
+      "try { rs.status(); } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:27017' }] }); }"
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -18,4 +45,5 @@ services:
       retries: 20
 
 volumes:
+  mongo_data:
   redis_data:

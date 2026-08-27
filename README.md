@@ -13,21 +13,44 @@
 
 - Node.js ≥ 20
 - pnpm 9 (`corepack enable` 하면 `packageManager` 필드로 자동 설치됨)
-- Docker Desktop (Redis 구동용)
-- MongoDB Atlas 계정 및 클러스터 (아래 참고)
+- Docker Desktop (완전 로컬로 띄울 경우 Mongo+Redis 구동용, Atlas를 쓸 경우 Redis만)
+- (온라인 모드를 쓸 경우) MongoDB Atlas 계정 및 클러스터 (아래 참고)
 
-## MongoDB Atlas
+## 데이터베이스: 로컬 또는 Atlas
 
-이 프로젝트는 로컬 MongoDB 대신 [Atlas](https://www.mongodb.com/cloud/atlas/register)를 사용합니다(무료 M0 티어로 충분).
+이 프로젝트는 **온라인(배포) 환경과 로컬 실행을 둘 다 지원**하도록 설계되어 있습니다 — 코드는
+어느 쪽인지 전혀 모르고, `DATABASE_URL` 하나로만 결정됩니다. 배포된 서비스(Atlas)가 무료 티어
+만료 등으로 안 되더라도 로컬 실행에는 영향이 없고, 반대도 마찬가지입니다.
+
+### 옵션 A — 완전 로컬 (인터넷 없이 동작, Google 로그인/AI 리포트만 예외)
+
+```bash
+docker compose -f docker/docker-compose.yml up -d
+```
+
+이 컴포즈 파일이 replica set으로 초기화된 로컬 Mongo(`mongo`/`mongo-init`)와 Redis를 함께
+띄웁니다. `apps/api/.env`의 `DATABASE_URL`을 아래처럼 두면 됩니다(`.env.example` 기본값).
+
+```
+DATABASE_URL="mongodb://localhost:27017/psyche?replicaSet=rs0"
+```
+
+로컬 Mongo는 Atlas와 완전히 별개의 빈 DB이므로, 최초 1회 [최초 설정](#최초-설정)의 시드
+단계까지 그대로 따라야 관리자 계정과 검사 정의가 생성됩니다.
+
+### 옵션 B — MongoDB Atlas (배포 환경, 또는 로컬에서 배포 DB에 직접 붙고 싶을 때)
+
+[Atlas](https://www.mongodb.com/cloud/atlas/register)는 무료 M0 티어로 충분합니다.
 
 1. Atlas에서 클러스터 생성(M0) → Database Access에서 사용자 생성 → Network Access에 접속을 허용할 IP 추가(배포 환경에서 접속하려면 `0.0.0.0/0` 필요)
 2. 클러스터의 "Connect → Drivers"에서 연결 문자열을 복사
-3. 문자열에 데이터베이스 이름을 추가해 `apps/api/.env`의 `DATABASE_URL`에 채워 넣습니다:
+3. 문자열에 데이터베이스 이름을 추가해 `DATABASE_URL`에 채워 넣습니다:
    ```
    mongodb+srv://<user>:<password>@<cluster-host>/psyche?appName=Cluster0
    ```
 
-Atlas는 M0부터 이미 replica set으로 동작하므로, 로컬 Docker Mongo에서 필요했던 별도의 replica set 초기화 과정이 필요 없습니다.
+Atlas는 M0부터 이미 replica set으로 동작하므로, 로컬 Docker Mongo와 달리 별도의 replica set
+초기화 과정이 필요 없습니다.
 
 ## 최초 설정
 
@@ -45,7 +68,7 @@ Atlas는 M0부터 이미 replica set으로 동작하므로, 로컬 Docker Mongo�
    cp .env.example apps/api/.env
    ```
 
-   `DATABASE_URL`은 본인의 MongoDB Atlas 클러스터 연결 문자열로 채워야 합니다(아래 "MongoDB Atlas" 참고).
+   `DATABASE_URL`은 로컬 Mongo 또는 본인의 Atlas 클러스터 연결 문자열로 채웁니다(위 "데이터베이스: 로컬 또는 Atlas" 참고).
 
    `apps/web/.env.local`에는 아래 한 줄만 있으면 됩니다.
 
@@ -53,13 +76,11 @@ Atlas는 M0부터 이미 replica set으로 동작하므로, 로컬 Docker Mongo�
    NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api/v1
    ```
 
-3. Redis 기동 (Docker)
+3. Mongo + Redis 기동 (Docker) — Atlas를 쓸 경우 mongo/mongo-init 컨테이너는 무시하고 Redis만 있으면 됩니다.
 
    ```bash
    docker compose -f docker/docker-compose.yml up -d
    ```
-
-   MongoDB는 로컬 컨테이너가 아니라 Atlas를 사용하므로(아래 참고), 이 컴포즈 파일은 Redis(BullMQ 큐용)만 기동합니다.
 
 4. Prisma 클라이언트 생성 및 스키마 반영
 
@@ -120,10 +141,11 @@ pnpm --filter @psyche/web dev
 |---|---|
 | Web (Next.js) | 3000 |
 | API (NestJS) | 4000 (기본값, `.env`의 `PORT`로 변경 가능) |
-| MongoDB | Atlas(클라우드) |
+| MongoDB | 27017 (로컬) 또는 Atlas(클라우드) |
 | Redis | 6379 |
 
 ## 트러블슈팅
 
-- **`DATABASE_URL` 관련 연결 오류가 나는 경우**: Atlas의 Network Access에 현재 접속 환경의 IP(또는 `0.0.0.0/0`)가 허용되어 있는지, `DATABASE_URL`에 데이터베이스 이름(`/psyche`)이 빠지지 않았는지 확인하세요.
+- **`DATABASE_URL` 관련 연결 오류가 나는 경우(로컬)**: `docker compose -f docker/docker-compose.yml up -d`로 `mongo`/`mongo-init` 컨테이너가 떠 있는지, `DATABASE_URL`에 `?replicaSet=rs0`가 빠지지 않았는지 확인하세요.
+- **`DATABASE_URL` 관련 연결 오류가 나는 경우(Atlas)**: Atlas의 Network Access에 현재 접속 환경의 IP(또는 `0.0.0.0/0`)가 허용되어 있는지, `DATABASE_URL`에 데이터베이스 이름(`/psyche`)이 빠지지 않았는지 확인하세요.
 - **로그인/시드 계정이 안 보이는 경우**: `.env`의 `ADMIN_EMAIL`/`ADMIN_PASSWORD` 값과 `pnpm --filter @psyche/api prisma:seed` 실행 여부를 확인하세요.
