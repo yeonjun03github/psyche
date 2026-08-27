@@ -214,6 +214,8 @@ export class ReportsService {
     const reply = await this.aiProvider.generateText({
       systemPrompt,
       messages: history.map((m) => ({ role: m.role === 'ASSISTANT' ? 'assistant' : 'user', content: m.content })),
+      // 사용자가 실시간으로 기다리는 대화라 리포트 생성용 "품질 우선" 모델보다 속도를 우선한다.
+      preferFast: true,
     });
 
     const assistantMessage = await this.prisma.reportChatMessage.create({

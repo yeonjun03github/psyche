@@ -20,6 +20,12 @@ export interface AITextGenerationRequest {
   systemPrompt: string;
   /** 대화 히스토리 전체(직전 사용자 메시지 포함) — 벤더별 role 표기로 변환하는 것은 각 provider의 책임. */
   messages: AIChatMessage[];
+  /**
+   * true면 리포트 생성용 "품질 우선" 모델보다, 짧은 대화 응답에 맞는 더 빠른 모델을 우선
+   * 시도한다(지원하지 않는 provider는 무시해도 된다) — 리포트 채팅처럼 사용자가 실시간으로
+   * 기다리는 멀티턴 대화에서 쓴다.
+   */
+  preferFast?: boolean;
 }
 
 export interface AIProvider {
