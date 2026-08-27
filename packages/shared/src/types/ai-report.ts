@@ -1,23 +1,27 @@
 /**
- * AI 리포트는 검사별 결과를 나열하지 않고, 7종 필수 검사를 하나의 인물상으로
- * 통합 해석한 서사형 리포트다. 각 필드는 특정 검사 하나가 아니라 전체 종합 결론이다.
+ * AI 리포트는 검사별 결과를 나열하지 않고, 7종 필수 검사를 하나의 인물상으로 통합 해석한
+ * 서사형 리포트다. 각 필드는 특정 검사 하나가 아니라 전체 종합 결론이며, "검사에서 확인되는
+ * 사실 → 수검자가 보고한 상황 → 관련 가능성(가설) → 알 수 없는 점" 순서로 사실과 해석을
+ * 명확히 분리해 서술한다.
+ *
+ * confirmedStatus 이후 필드들은 이 구조로 개편되기 전 리포트에는 존재하지 않으므로 전부
+ * optional(string | null)이다 — 없으면 UI가 그 섹션을 건너뛴다.
  */
 export interface AIReportSections {
   overallSummary: string;
   personalityProfile: string;
-  currentMentalHealthStatus: string;
-  primaryConcern: string;
-  primaryStrength: string;
-  crossTestCorrelations: string;
-  /** 반드시 "가능성/가설" 어조로만 작성 — 단정적 인과 진술 금지 */
-  possibleCausalHypotheses: string;
-  maintainingFactors: string;
-  aggravatingFactors: string;
-  highestLeverageChangeFactor: string;
-  priorityIssues: string;
-  improvementRoadmap: string;
+  confirmedStatus: string | null;
+  confirmedStrength: string | null;
+  crossTestPatterns: string | null;
+  /** 사용자가 남긴 참고 메모가 없으면 null — AI의 추론을 섞지 않고 보고 내용만 담는다. */
+  reportedSituation: string | null;
+  /** 참고 메모가 없으면 관련지을 "현재 상황" 자체가 없으므로 null. 반드시 가설 어조로만 작성. */
+  possibleRelevance: string | null;
+  unknownFromCurrentData: string | null;
+  suggestedFollowUps: string | null;
+  selfCareDirections: string | null;
   metricsToTrack: string;
-  recommendedRetestTiming: string;
+  retestGuidance: string | null;
   /** 이전 리포트(PersonModel)가 없으면 5개 전부 null */
   changesSincePrevious: string | null;
   improvedAreas: string | null;
@@ -44,18 +48,16 @@ export const AI_REPORT_SECTION_LABELS: Record<
 > = {
   overallSummary: '📝 전체 요약',
   personalityProfile: '🎨 성격 프로파일',
-  currentMentalHealthStatus: '🧠 현재 정신건강 상태',
-  primaryConcern: '⚠️ 현재 가장 큰 문제',
-  primaryStrength: '💪 현재 가장 큰 강점',
-  crossTestCorrelations: '🔗 검사 결과 간 연관성',
-  possibleCausalHypotheses: '🔍 왜 이런 결과가 나왔을 가능성이 있는가',
-  maintainingFactors: '🔄 지금 상태와 관련 있을 수 있는 요인',
-  aggravatingFactors: '⚡ 앞으로 주의가 필요할 수 있는 요인',
-  highestLeverageChangeFactor: '🔑 개선 가능성이 가장 높은 요소',
-  priorityIssues: '🎯 우선적으로 해결해야 할 문제',
-  improvementRoadmap: '🗺️ 개선 로드맵',
+  confirmedStatus: '🧠 현재 검사에서 확인되는 상태',
+  confirmedStrength: '💪 현재 확인되는 강점',
+  crossTestPatterns: '🔗 검사 결과에서 함께 나타난 패턴',
+  reportedSituation: '🗣️ 수검자가 보고한 현재 상황',
+  possibleRelevance: '🔎 현재 상황과 검사 결과의 관련 가능성',
+  unknownFromCurrentData: '❓ 현재 자료만으로 알 수 없는 점',
+  suggestedFollowUps: '📌 추가로 확인해보면 좋은 부분',
+  selfCareDirections: '🎯 현재 결과를 바탕으로 생각해볼 수 있는 자기관리 방향',
   metricsToTrack: '📊 향후 추적하면 좋은 지표',
-  recommendedRetestTiming: '📅 재검사를 추천하는 시점',
+  retestGuidance: '📅 재검사 안내',
   changesSincePrevious: '📈 이전 리포트 이후 변화',
   improvedAreas: '🌱 개선된 영역',
   worsenedAreas: '📉 악화된 영역',
@@ -64,20 +66,17 @@ export const AI_REPORT_SECTION_LABELS: Record<
 };
 
 /**
- * "확신도(claimsConfidence)"와 사용자 피드백 대상을 이 서브셋으로 제한한다 — 절차적/권고성
- * 섹션(priorityIssues, improvementRoadmap, metricsToTrack, recommendedRetestTiming)은
- * "얼마나 확신하는가"를 물을 대상이 아니라서 제외한다.
+ * "확신도(claimsConfidence)"와 사용자 피드백 대상을 이 서브셋으로 제한한다 — 순수 보고
+ * (reportedSituation), 한계 고지(unknownFromCurrentData), 절차적/권고성 섹션
+ * (suggestedFollowUps, selfCareDirections, metricsToTrack, retestGuidance)은 "얼마나
+ * 확신하는가"를 물을 대상이 아니라서 제외한다.
  */
 export const CLAIM_SECTION_KEYS = [
   'personalityProfile',
-  'currentMentalHealthStatus',
-  'primaryConcern',
-  'primaryStrength',
-  'crossTestCorrelations',
-  'possibleCausalHypotheses',
-  'maintainingFactors',
-  'aggravatingFactors',
-  'highestLeverageChangeFactor',
+  'confirmedStatus',
+  'confirmedStrength',
+  'crossTestPatterns',
+  'possibleRelevance',
   'changesSincePrevious',
   'improvedAreas',
   'worsenedAreas',

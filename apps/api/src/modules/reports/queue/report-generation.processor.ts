@@ -17,6 +17,9 @@ export interface ReportGenerationJobData {
 /** 이전 PersonModel이 없어도 LLM이 지시를 어기고 값을 채울 수 있어, 코드가 한 번 더 강제한다. */
 const LONGITUDINAL_KEYS = ['changesSincePrevious', 'improvedAreas', 'worsenedAreas', 'unchangedAreas', 'areasToWatch'] as const;
 
+/** 참고 메모가 없어도 LLM이 지시를 어기고 값을 채울 수 있어, 코드가 한 번 더 강제한다. */
+const CONTEXT_DEPENDENT_KEYS = ['reportedSituation', 'possibleRelevance'] as const;
+
 type PersonModelWithPrevious = PersonModelSnapshot & { metadata: { previousPersonModelId: string | null } };
 
 @Processor(REPORT_GENERATION_QUEUE)
@@ -89,7 +92,11 @@ export class ReportGenerationProcessor extends WorkerHost {
         jsonSchema: reportSectionsJsonSchema,
         schemaName: 'psyche_report_sections',
       });
-      const sections = this.enforceLongitudinalNullability(reportSectionsSchema.parse(raw), previousComparison);
+      const parsed = reportSectionsSchema.parse(raw);
+      const sections = this.enforceContextDependentNullability(
+        this.enforceLongitudinalNullability(parsed, previousComparison),
+        report.context,
+      );
 
       await this.prisma.aIReport.update({
         where: { id: report.id },
@@ -137,6 +144,20 @@ export class ReportGenerationProcessor extends WorkerHost {
     // 비교 자료가 없으면 그 5개 섹션에 대한 확신도 항목도 의미가 없으므로 함께 제거한다.
     forced.claimsConfidence = sections.claimsConfidence.filter(
       (c) => !(LONGITUDINAL_KEYS as readonly string[]).includes(c.section),
+    );
+    return forced;
+  }
+
+  /** LLM이 프롬프트 지시(참고 메모 없으면 null)를 어겨도 코드가 방어적으로 한 번 더 강제한다. */
+  private enforceContextDependentNullability(sections: ReportSections, context: string | null): ReportSections {
+    if (context) return sections;
+
+    const forced = { ...sections };
+    for (const key of CONTEXT_DEPENDENT_KEYS) {
+      forced[key] = null;
+    }
+    forced.claimsConfidence = forced.claimsConfidence.filter(
+      (c) => !(CONTEXT_DEPENDENT_KEYS as readonly string[]).includes(c.section),
     );
     return forced;
   }

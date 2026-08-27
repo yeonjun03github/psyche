@@ -6,7 +6,7 @@ describe('buildReportPrompt', () => {
     expect(systemPrompt).toContain('진단');
     expect(systemPrompt).toContain('가설');
     expect(systemPrompt).toContain('overallSummary');
-    expect(systemPrompt).toContain('recommendedRetestTiming');
+    expect(systemPrompt).toContain('retestGuidance');
   });
 
   it('단일 척도 검사와 하위척도 검사를 모두 사용자 프롬프트에 반영한다', () => {
@@ -88,7 +88,7 @@ describe('buildReportPrompt', () => {
     const { userPrompt } = buildReportPrompt({
       testResults: [],
       priorFeedback: [
-        { section: 'possibleCausalHypotheses', confirmedCount: 0, partiallyConfirmedCount: 0, rejectedCount: 2, latestNote: '아니에요' },
+        { section: 'possibleRelevance', confirmedCount: 0, partiallyConfirmedCount: 0, rejectedCount: 2, latestNote: '아니에요' },
       ],
     });
 

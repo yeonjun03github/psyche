@@ -258,20 +258,21 @@ type PsychNickname {
 }
 
 type ReportSections {
-  overallSummary              String
-  personalityProfile          String
-  currentMentalHealthStatus   String
-  primaryConcern               String
-  primaryStrength               String
-  crossTestCorrelations          String
-  possibleCausalHypotheses        String
-  maintainingFactors                String
-  aggravatingFactors                 String
-  highestLeverageChangeFactor          String
-  priorityIssues                        String
-  improvementRoadmap                     String
-  metricsToTrack                          String
-  recommendedRetestTiming                  String
+  overallSummary     String
+  personalityProfile String
+  // --- 아래 필드들은 "사실 → 보고 → 해석 → 가설 → 미확인" 구조 개편(2026-08) 이후 도입됐다.
+  // optional인 이유: 개편 이전 리포트 문서에는 이 필드들이 없어, required로 두면 그 문서들을
+  // 읽을 때(findMany 등) Prisma가 역직렬화에 실패해 전체 조회가 깨진다.
+  confirmedStatus         String?
+  confirmedStrength       String?
+  crossTestPatterns       String?
+  reportedSituation       String? // 참고 메모가 없으면 null
+  possibleRelevance       String? // 관련지을 참고 메모가 없으면 null
+  unknownFromCurrentData  String?
+  suggestedFollowUps      String?
+  selfCareDirections      String?
+  metricsToTrack          String
+  retestGuidance          String?
   // --- 종단 비교 (previousPersonModelId가 없으면 전부 null) ---
   changesSincePrevious String?
   improvedAreas        String?
