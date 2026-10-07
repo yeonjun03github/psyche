@@ -3,8 +3,14 @@ import { AI_REPORT_SECTION_LABELS } from '@psyche/shared';
 export interface ChatTestScoreInput {
   testName: string;
   normalizedScore: number | null;
+  /** 절단점이 없는 검사는 null */
   band: string | null;
-  subscaleScores: { name: string; normalizedScore: number; band: string }[];
+  subscaleScores: { name: string; normalizedScore: number; band: string | null; displayRawScore?: string | null }[];
+  /** 예: "38점 (범위 18–72)". 있으면 0-100 환산과 구분해서 함께 전달한다. */
+  displayRawScore?: string | null;
+  scoreLabel?: string;
+  alternateScores?: { name: string; displayRawScore: string; band: string | null }[];
+  meta?: { scoreDirection: string; hasCutoff: boolean; translationStatus: string } | null;
 }
 
 /** claimsConfidence 등 표시하지 않는 필드까지 강타입으로 요구하지 않도록, 실제로 쓰는 서술 필드만 느슨하게 받는다. */
@@ -16,14 +22,35 @@ export interface BuildChatSystemPromptInput {
   reportContext?: string | null;
 }
 
+function bandSuffix(band: string | null): string {
+  return band ? ` (${band})` : '';
+}
+
 function formatTestScores(items: ChatTestScoreInput[]): string {
   return items
     .map((item) => {
-      if (item.normalizedScore != null) {
-        return `- ${item.testName}: ${item.normalizedScore}/100 (${item.band})`;
+      const header = [item.testName];
+      if (item.meta) {
+        const unofficial = item.meta.translationStatus === 'UNOFFICIAL_TRANSLATION' ? ' / 비공식 번역' : '';
+        header.push(
+          `[점수 방향: ${item.meta.scoreDirection} / 절단점 ${item.meta.hasCutoff ? '있음' : '없음'}${unofficial}]`,
+        );
       }
-      const subLines = item.subscaleScores.map((s) => `    - ${s.name}: ${s.normalizedScore}/100 (${s.band})`).join('\n');
-      return `- ${item.testName}\n${subLines}`;
+      const lines: string[] = [];
+      if (item.normalizedScore != null) {
+        const raw = item.displayRawScore ? `원점수 ${item.displayRawScore}, ` : '';
+        lines.push(
+          `    ${item.scoreLabel ?? '점수'}: ${raw}0-100 환산(상대 위치) ${item.normalizedScore}/100${bandSuffix(item.band)}`,
+        );
+      }
+      for (const s of item.subscaleScores) {
+        const raw = s.displayRawScore ? `원점수 ${s.displayRawScore}, ` : '';
+        lines.push(`    - ${s.name}: ${raw}0-100 환산(상대 위치) ${s.normalizedScore}/100${bandSuffix(s.band)}`);
+      }
+      for (const a of item.alternateScores ?? []) {
+        lines.push(`    - 보조 점수 ${a.name}: 원점수 ${a.displayRawScore}${bandSuffix(a.band)}`);
+      }
+      return `- ${header.join(' ')}\n${lines.join('\n')}`;
     })
     .join('\n');
 }
@@ -71,6 +98,11 @@ ${formatSections(input.sections)}
    같은 도움을 받을 수 있는 경로를 안내하십시오.
 4. 검사명이나 점수를 딱딱하게 나열하지 말고, 상담사가 대화하듯 자연스러운 한국어 구어체로
    답하십시오. 답은 짧고 명확하게 — 한 번에 여러 주제를 욱여넣지 마십시오.
-5. 사용자가 리포트에서 드래그해 가져온 문장이 메시지에 포함되어 있다면, 그 문장이 어떤
+5. 점수 목록의 "0-100 환산"은 원점수의 상대 위치일 뿐 원점수나 임상 기준이 아닙니다. 절단점이
+   없는 검사(AES, ALS-18, SHAPS 차원 점수)를 "정상/비정상" 같은 구간으로 말하지 마십시오. AES 점수로
+   무기력의 원인을 추정하지 말고, ALS-18 점수로 특정 정신질환이나 기분장애를 진단·암시하지 말며,
+   SHAPS 결과를 우울증 진단과 동일시하지 마십시오. 비공식 번역 검사는 한국어판이 검증되지 않았다는
+   점을 감안해 말하고, 검사 간 함께 나타난 점수를 인과로 해석하지 마십시오.
+6. 사용자가 리포트에서 드래그해 가져온 문장이 메시지에 포함되어 있다면, 그 문장이 어떤
    맥락에서 나온 서술인지 리포트 전체 관점에서 설명하는 데 우선순위를 두십시오.`;
 }

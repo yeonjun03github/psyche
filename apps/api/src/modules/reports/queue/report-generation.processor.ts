@@ -8,6 +8,7 @@ import { reportSectionsSchema, reportSectionsJsonSchema, type ReportSections } f
 import { REPORT_GENERATION_QUEUE } from './report-generation.queue';
 import { computeAssessmentTimeline } from '../../integration/domain/assessment-timeline';
 import { diffPersonModels, toPersonModelDiffInput, type PersonModelSnapshot } from '../../integration/domain/person-model-diff';
+import { buildTestScoreView } from '../../integration/domain/test-score-view';
 import { summarizeFeedbackHistory } from '../domain/feedback-summary';
 
 export interface ReportGenerationJobData {
@@ -52,6 +53,7 @@ export class ReportGenerationProcessor extends WorkerHost {
         where: { code: { in: personModel.testResults.map((t) => t.testCode) } },
       });
       const nameByCode = new Map(definitions.map((d) => [d.code, d.name]));
+      const definitionByCode = new Map(definitions.map((d) => [d.code, d]));
 
       const timeline = computeAssessmentTimeline(
         personModel.testResults.map((t) => ({
@@ -77,17 +79,14 @@ export class ReportGenerationProcessor extends WorkerHost {
         .filter((id): id is string => id != null);
 
       const { systemPrompt, userPrompt } = buildReportPrompt({
-        testResults: personModel.testResults.map((t) => ({
-          testCode: t.testCode,
-          testName: nameByCode.get(t.testCode) ?? t.testCode,
-          normalizedScore: t.normalizedScore,
-          band: t.band,
-          subscaleScores: t.subscaleScores.map((s) => ({
-            name: s.name,
-            normalizedScore: s.normalizedScore,
-            band: s.band,
-          })),
-        })),
+        // 원점수·범위·0-100 환산·해석 구간·검사 메타데이터를 화면과 같은 변환기로 만들어 전달한다.
+        testResults: personModel.testResults.map((t) => {
+          const definition = definitionByCode.get(t.testCode);
+          if (!definition) {
+            throw new Error(`검사 정의 "${t.testCode}"를 찾을 수 없습니다.`);
+          }
+          return buildTestScoreView(t, definition);
+        }),
         reportContext: report.context ?? undefined,
         timeline,
         previousComparison,

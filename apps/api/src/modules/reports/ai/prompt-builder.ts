@@ -7,15 +7,42 @@ import { QUOTE_BANK } from './quote-bank';
 export interface PromptSubscaleResult {
   name: string;
   normalizedScore: number;
-  band: string;
+  /** 절단점이 없는 하위척도는 null */
+  band: string | null;
+  /** 예: "2.40점 (범위 1–4)". 없으면(메타데이터 이전 입력) 정규화 점수만 서술한다. */
+  displayRawScore?: string | null;
 }
 
+export interface PromptAlternateScore {
+  name: string;
+  displayRawScore: string;
+  band: string | null;
+}
+
+export interface PromptTestMeta {
+  concept: string;
+  scoreDirection: string;
+  hasCutoff: boolean;
+  translationStatus: string;
+  translationNote: string | null;
+  interpretationCaveats: string[];
+}
+
+/**
+ * AI에게 전달되는 검사 결과 한 건. normalizedScore(0-100 상대 위치)와 원점수(displayRawScore, 범위 포함),
+ * 해석 구간(band), 검사 메타데이터를 서로 다른 필드로 구분해서 받는다 — 하나로 뭉치면 모델이
+ * "26/100 경미"처럼 원점수와 환산 점수를 혼동해 서술하기 때문이다.
+ */
 export interface PromptTestResult {
   testCode: string;
   testName: string;
   normalizedScore: number | null;
   band: string | null;
   subscaleScores: PromptSubscaleResult[];
+  scoreLabel?: string;
+  displayRawScore?: string | null;
+  alternateScores?: PromptAlternateScore[];
+  meta?: PromptTestMeta | null;
 }
 
 export interface BuildReportPromptInput {
@@ -42,7 +69,7 @@ export interface BuiltPrompt {
  * 생성됐는지 추적한다(재현성). 프롬프트 텍스트나 섹션 구성이 바뀔 때만 값을 올린다 — 스키마
  * 버전을 따로 두지 않는 이유는 둘이 항상 같이 바뀌기 때문(불필요한 중복 카운터 방지).
  */
-export const PROMPT_VERSION = '10';
+export const PROMPT_VERSION = '11';
 
 /** 이 5개는 이전 리포트가 없으면 반드시 null이어야 하는 종단 비교 섹션이다. */
 const LONGITUDINAL_SECTION_KEYS = new Set([
@@ -112,7 +139,7 @@ const SYSTEM_PROMPT = `당신은 여러 심리검사 결과를 근거로 삼아 
 읽혀야 합니다.
 
 가장 중요한 원칙 — 사람이 주인공이고, 검사는 근거일 뿐입니다:
-본문에서는 검사명이나 코드(PHQ-9, GAD-7, WHO-5, PSS-10, RSES, IPIP-50, BRS 등)와 점수를 절대
+본문에서는 검사명이나 코드(PHQ-9, GAD-7, WHO-5, PSS-10, RSES, IPIP-50, BRS, AES, ALS-18, SHAPS 등)와 점수를 절대
 반복해서 언급하지 마십시오. 사람의 상태·성향을 사람의 언어로 먼저 서술하고, 검사명은 오직
 claimsConfidence.evidence 필드에서만 사용하십시오.
 - 나쁜 예: "PHQ-9에서 우울 점수가 높고, WHO-5에서 웰빙 지수가 낮으며, RSES에서 자존감이 낮게
@@ -160,7 +187,7 @@ claimsConfidence.evidence 필드에서만 사용하십시오.
 세 번째로 중요한 원칙 — 점수의 실제 정도에 맞게 서술하고, 일부 긍정 지표로 전체를 낙관적으로
 포장하지 않습니다:
 검사 점수가 척도상 극단적인 값(예: 정규화 점수가 15 이하로 매우 낮거나 85 이상으로 매우 높은
-경우)이면 그 정도를 축소해서 표현하지 마십시오. "다소 낮다", "약간 저하되었다"처럼 순화된
+경우 — 단, 점수 방향은 검사마다 다르므로 각 검사에 적힌 "점수 방향"을 먼저 확인하십시오)이면 그 정도를 축소해서 표현하지 마십시오. "다소 낮다", "약간 저하되었다"처럼 순화된
 표현은 중간 정도의 점수에만 쓰고, 극단적인 점수는 그 강도에 맞게 명확히 서술하십시오(과장할
 필요는 없지만 절대 축소해서도 안 됩니다). 또한 일부 지표가 낮다는 사실(예: 불안이 높지 않다)을
 전체적으로 "정서적으로 안정적이다", "균형 잡혀 있다", "잘 견디고 있다"처럼 종합적으로 좋은
@@ -265,6 +292,30 @@ claimsConfidence.evidence 필드에서만 사용하십시오.
     의료적 요인을 배제하지 않은 상태에서의 잠정적 제안임을 함께 밝히십시오. 절대 스스로 복약을
     중단하거나 용법을 조정하라고 권하지 마십시오 — 오직 처방의와 상의하라고만 안내하십시오.
 
+20. 일부 검사에는 "검사 정보"(측정 개념, 점수 방향, 절단점 유무, 번역 상태, 해석 시 주의사항)가
+    함께 주어집니다. 이 정보를 점수 해석의 전제로 삼으십시오.
+    - 정규화 점수(0-100)는 원점수가 이론상 범위 안에서 어디쯤인지 보여주는 상대 위치일 뿐, 원점수도
+      임상 기준도 아닙니다. 원점수와 범위가 함께 주어지면 원점수를 기준으로 판단하고 정규화 점수를
+      "몇 점 만점 중 몇 점"처럼 서술하지 마십시오.
+    - "절단점: 없음"인 검사(AES, ALS-18, SHAPS 차원 점수)는 "정상/비정상", "경미/심각" 같은 임상 구간으로
+      서술하지 마십시오. 해석 구간이 없으면 임의로 만들지 마십시오.
+    - AES(무의욕): 점수가 높다고 해서 무기력의 원인(우울, 피로, 수면, 신체 질환, 약물 등)을 추정하지
+      마십시오. 사용자 메모에 직장·이직·학업 같은 최근 사건이 있어도 "직장 때문에 무기력하다"처럼
+      그 사건을 무기력의 원인으로 단정하지 마십시오(동시에 존재할 뿐이며 선후관계와 원인은 알 수
+      없습니다). 의욕·주도성에 대한 자기보고 정도로만 서술하십시오.
+    - ALS-18(정서적 불안정성): 점수가 높다고 해서 특정 정신질환이나 기분장애(양극성장애, 경계성
+      성격장애 등)를 진단하거나 암시하지 마십시오. 하위척도(불안/우울, 우울/들뜸, 분노)는 하나의 점수로 뭉뚱그리지 말고 각각 구분해 서술하십시오.
+    - SHAPS(무쾌감): 이분 점수(절단점 3점)와 차원 점수는 서로 다른 점수이므로 하나로 합치거나
+      서로 환산하지 마십시오. 절단점 이상이어도 "비정상"이라 부르거나 우울증 진단과 동일시하지
+      마십시오(원판 영어 기준이며 한국어 번역본에서 검증되지 않았습니다).
+    - 번역 상태가 "비공식 번역"인 검사는 한국어판 신뢰도·타당도가 검증되지 않았다는 점을 해석의
+      확신도에 반영하십시오(해당 검사에 의존한 주장의 confidence를 HIGH로 두지 마십시오).
+    - 선택 검사는 완료한 경우에만 결과가 주어집니다. 결과가 없다고 해서 그 상태가 "정상"이라고
+      해석하지 말고 "알 수 없음"으로 취급하십시오.
+    - 이 검사들끼리, 또는 성격검사(Big Five)를 포함한 다른 검사와 함께 높거나 낮게 나타난 것은 함께
+      관찰된 것일 뿐 인과가 아닙니다. 두 점수가 동시에 존재한다는 이유만으로 "A 때문에 B"라는
+      관계를 만들지 마십시오. 위 "사실·보고·해석·가설" 구분 원칙을 이 검사들에도 똑같이 적용하십시오.
+
 절대 하지 말 것: 검사 결과·점수 나열, 검사명 본문 반복, 같은 내용 반복, 논문/교과서 문체,
 규칙 기반으로 판정하는 듯한 서술, 의학적 진단, MBTI를 진단처럼 단정하거나 유형 하나로 확정하는 것,
 명언 후보 목록에 없는 문구를 명언으로 제시하는 것, 저자가 불확실한 명언을 사용하는 것, "~ 때문에
@@ -276,14 +327,78 @@ claimsConfidence.evidence 필드에서만 사용하십시오.
 섹션 설명:
 ${buildSectionDescriptions()}`;
 
-function formatTestResult(result: PromptTestResult): string {
-  if (result.subscaleScores.length > 0) {
-    const factors = result.subscaleScores
-      .map((s) => `    - ${s.name}: 정규화 점수 ${s.normalizedScore}/100 (${s.band})`)
-      .join('\n');
-    return `- ${result.testName} (${result.testCode})\n${factors}`;
+const TRANSLATION_STATUS_LABELS: Record<string, string> = {
+  PUBLISHED_KOREAN_VERSION: '번역·타당화 논문이 있는 한국판(출처 기재 기준, 이 앱의 문항 문구는 원문 대조 미완료)',
+  UNOFFICIAL_TRANSLATION: '비공식 번역(한국어판 신뢰도·타당도 미검증)',
+};
+
+function formatBand(band: string | null, hasCutoff: boolean | undefined): string {
+  if (band !== null) return band;
+  if (hasCutoff === false) return '없음(확립된 절단점 없음)';
+  return hasCutoff === true ? '없음(이 점수에는 절단점 없음 — 절단점은 다른 점수에만 있음)' : '없음';
+}
+
+function formatTestMeta(meta: PromptTestMeta): string[] {
+  const lines = [
+    `    검사 정보 — 측정 개념: ${meta.concept}`,
+    `    점수 방향: ${meta.scoreDirection}`,
+    `    절단점: ${meta.hasCutoff ? '있음(아래 해석 구간 참고)' : '없음'}${
+      meta.hasCutoff && meta.translationStatus === 'UNOFFICIAL_TRANSLATION'
+        ? ' — 원판(영어) 기준이며 이 한국어 번역본에서는 검증되지 않았음'
+        : ''
+    }`,
+    `    번역·한국어판 상태: ${TRANSLATION_STATUS_LABELS[meta.translationStatus] ?? meta.translationStatus}${meta.translationNote ? ` — ${meta.translationNote}` : ''}`,
+  ];
+  if (meta.interpretationCaveats.length > 0) {
+    lines.push(`    해석 시 주의사항: ${meta.interpretationCaveats.join(' / ')}`);
   }
-  return `- ${result.testName} (${result.testCode}): 정규화 점수 ${result.normalizedScore}/100 (${result.band})`;
+  return lines;
+}
+
+function formatTestResult(result: PromptTestResult): string {
+  const hasRichDetail =
+    result.displayRawScore != null ||
+    result.subscaleScores.some((s) => s.displayRawScore != null) ||
+    result.meta != null ||
+    (result.alternateScores?.length ?? 0) > 0;
+
+  // 원점수·메타데이터가 없는 입력은 기존 형식을 그대로 쓴다.
+  if (!hasRichDetail) {
+    if (result.subscaleScores.length > 0) {
+      const factors = result.subscaleScores
+        .map((s) => `    - ${s.name}: 정규화 점수 ${s.normalizedScore}/100${s.band ? ` (${s.band})` : ''}`)
+        .join('\n');
+      return `- ${result.testName} (${result.testCode})\n${factors}`;
+    }
+    return `- ${result.testName} (${result.testCode}): 정규화 점수 ${result.normalizedScore}/100${result.band ? ` (${result.band})` : ''}`;
+  }
+
+  const hasCutoff = result.meta?.hasCutoff;
+  const lines = [`- ${result.testName} (${result.testCode})`];
+  if (result.meta) lines.push(...formatTestMeta(result.meta));
+
+  if (result.displayRawScore != null) {
+    const normalized = result.normalizedScore !== null ? `${result.normalizedScore}/100` : '해당 없음';
+    lines.push(
+      `    ${result.scoreLabel ?? '점수'}: 원점수 ${result.displayRawScore} | 0-100 환산(상대 위치, 원점수 아님): ${normalized} | 해석 구간: ${formatBand(result.band, hasCutoff)}`,
+    );
+  }
+  if (result.subscaleScores.length > 0) {
+    lines.push('    하위척도:');
+    for (const s of result.subscaleScores) {
+      const raw = s.displayRawScore ? `원점수 ${s.displayRawScore} | ` : '';
+      lines.push(
+        `      - ${s.name}: ${raw}0-100 환산(상대 위치, 원점수 아님): ${s.normalizedScore}/100 | 해석 구간: ${formatBand(s.band, hasCutoff)}`,
+      );
+    }
+  }
+  if (result.alternateScores && result.alternateScores.length > 0) {
+    lines.push('    보조 점수(주 점수와 별개의 점수, 서로 환산하지 않음):');
+    for (const a of result.alternateScores) {
+      lines.push(`      - ${a.name}: 원점수 ${a.displayRawScore} | 해석 구간: ${a.band ?? '없음'}`);
+    }
+  }
+  return lines.join('\n');
 }
 
 function formatTimeline(timeline: AssessmentTimeline): string {
@@ -298,12 +413,17 @@ function formatDelta(delta: number | null): string {
   return delta > 0 ? `+${delta}` : `${delta}`;
 }
 
+/** 해석 구간이 없는 검사(절단점 없음)는 "(null)"이 아니라 괄호 자체를 생략한다. */
+function bandSuffix(band: string | null): string {
+  return band ? `(${band})` : '';
+}
+
 function formatPreviousComparison(diff: PersonModelDiff): string {
   const lines = diff.testDiffs.map((d) => {
     const scoreLine =
       d.delta !== null
-        ? `- ${d.testCode}: 이전 ${d.previousNormalizedScore}/100(${d.previousBand}) → 현재 ${d.currentNormalizedScore}/100(${d.currentBand}), 변화량 ${formatDelta(d.delta)}`
-        : `- ${d.testCode}: 이전 리포트에는 없던 검사, 현재 ${d.currentNormalizedScore}/100(${d.currentBand})`;
+        ? `- ${d.testCode}: 이전 ${d.previousNormalizedScore}/100${bandSuffix(d.previousBand)} → 현재 ${d.currentNormalizedScore}/100${bandSuffix(d.currentBand)}, 변화량 ${formatDelta(d.delta)}`
+        : `- ${d.testCode}: 이전 리포트에는 없던 검사 또는 비교 가능한 전체 점수 없음, 현재 ${d.currentNormalizedScore ?? '해당 없음'}${d.currentNormalizedScore !== null ? '/100' : ''}${bandSuffix(d.currentBand)}`;
     const subLines = d.subscaleDiffs.map(
       (s) =>
         `    - ${s.name}: 이전 ${s.previousNormalizedScore} → 현재 ${s.currentNormalizedScore} (변화량 ${formatDelta(s.delta)})`,
@@ -343,8 +463,8 @@ export function buildReportPrompt(input: BuildReportPromptInput): BuiltPrompt {
   const body = input.testResults.map(formatTestResult).join('\n');
 
   const blocks: string[] = [
-    `다음은 한 사람이 완료한 필수 심리검사의 표준화된 결과입니다.
-원문항 응답이 아니라, 각 검사 자체의 검증된 채점 기준으로 계산된 표준화 점수입니다.
+    `다음은 한 사람이 완료한 심리검사(필수 검사 + 완료한 선택 검사)의 결과입니다.
+원문항 응답이 아니라, 각 검사 자체의 채점 기준으로 계산된 원점수와 0-100 환산 점수(상대 위치)입니다.
 
 ${body}`,
   ];

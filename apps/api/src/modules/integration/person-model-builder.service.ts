@@ -29,10 +29,23 @@ export interface ReportPreview {
 export class PersonModelBuilderService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** 사용자별 필수 검사 코드에 대해 "가장 최근에 완료된" 세션만 골라낸다. */
-  private async selectLatestSessions(userId: string, essentialCodes: string[]) {
+  /** DB에 등록된 선택(OPTIONAL) 검사 코드. 시드에 선택 검사가 추가되면 코드 수정 없이 리포트 입력에 반영된다. */
+  private async findOptionalCodes(): Promise<string[]> {
+    const optional = await this.prisma.testDefinition.findMany({
+      where: { category: 'OPTIONAL' },
+      select: { code: true },
+      orderBy: { code: 'asc' },
+    });
+    return optional.map((d) => d.code);
+  }
+
+  /**
+   * 사용자별 검사 코드에 대해 "가장 최근에 완료된" 세션만 골라낸다.
+   * 필수 검사는 하나라도 없으면 missing에 담기지만, 선택 검사는 완료한 것만 포함되고 없어도 missing이 아니다.
+   */
+  private async selectLatestSessions(userId: string, essentialCodes: string[], optionalCodes: string[]) {
     const completedSessions = await this.prisma.testSession.findMany({
-      where: { userId, testCode: { in: essentialCodes }, status: 'COMPLETED' },
+      where: { userId, testCode: { in: [...essentialCodes, ...optionalCodes] }, status: 'COMPLETED' },
       orderBy: { completedAt: 'desc' },
     });
 
@@ -44,7 +57,8 @@ export class PersonModelBuilderService {
     }
 
     const missing = essentialCodes.filter((code) => !latestByCode.has(code));
-    return { latestByCode, missing };
+    const includedCodes = [...essentialCodes, ...optionalCodes.filter((code) => latestByCode.has(code))];
+    return { latestByCode, missing, includedCodes };
   }
 
   /**
@@ -54,14 +68,19 @@ export class PersonModelBuilderService {
    */
   async preview(userId: string): Promise<ReportPreview> {
     const essentialCodes: string[] = [...ESSENTIAL_TEST_CODES];
-    const { latestByCode, missing } = await this.selectLatestSessions(userId, essentialCodes);
+    const optionalCodes = await this.findOptionalCodes();
+    const { latestByCode, missing, includedCodes } = await this.selectLatestSessions(
+      userId,
+      essentialCodes,
+      optionalCodes,
+    );
 
     const definitions = await this.prisma.testDefinition.findMany({
-      where: { code: { in: essentialCodes } },
+      where: { code: { in: includedCodes } },
     });
     const nameByCode = new Map(definitions.map((d) => [d.code, d.name]));
 
-    const items: ReportPreviewItem[] = essentialCodes
+    const items: ReportPreviewItem[] = includedCodes
       .filter((code) => latestByCode.has(code))
       .map((code) => {
         const session = latestByCode.get(code)!;
@@ -96,13 +115,18 @@ export class PersonModelBuilderService {
    */
   async build(userId: string, options: { acknowledgeDateSpanWarning?: boolean } = {}) {
     const essentialCodes: string[] = [...ESSENTIAL_TEST_CODES];
-    const { latestByCode, missing } = await this.selectLatestSessions(userId, essentialCodes);
+    const optionalCodes = await this.findOptionalCodes();
+    const { latestByCode, missing, includedCodes } = await this.selectLatestSessions(
+      userId,
+      essentialCodes,
+      optionalCodes,
+    );
 
     if (missing.length > 0) {
       throw new BadRequestException(`다음 필수 검사를 아직 완료하지 않았습니다: ${missing.join(', ')}`);
     }
 
-    const completedAts = essentialCodes.map((code) => latestByCode.get(code)!.completedAt!);
+    const completedAts = includedCodes.map((code) => latestByCode.get(code)!.completedAt!);
     const dateSpan = computeDateSpanWarning(completedAts, DATE_SPAN_WARNING_THRESHOLD_DAYS);
     if (dateSpan.requiresConfirmation && !options.acknowledgeDateSpanWarning) {
       throw new BadRequestException(
@@ -111,11 +135,11 @@ export class PersonModelBuilderService {
     }
 
     const definitions = await this.prisma.testDefinition.findMany({
-      where: { code: { in: essentialCodes } },
+      where: { code: { in: includedCodes } },
     });
     const definitionByCode = new Map(definitions.map((d) => [d.code, d]));
 
-    const sourceSessionIds = essentialCodes.map((code) => latestByCode.get(code)!.id);
+    const sourceSessionIds = includedCodes.map((code) => latestByCode.get(code)!.id);
 
     const previous = await this.prisma.personModel.findFirst({
       where: { userId },
@@ -125,7 +149,7 @@ export class PersonModelBuilderService {
       return previous;
     }
 
-    const testResults = essentialCodes.map((code) => {
+    const testResults = includedCodes.map((code) => {
       const session = latestByCode.get(code)!;
       const definition = definitionByCode.get(code)!;
       return buildPersonModelTestResult(
@@ -135,6 +159,7 @@ export class PersonModelBuilderService {
           rawScore: session.rawScore,
           band: session.band,
           subscaleScores: session.subscaleScores,
+          alternateScores: session.alternateScores,
           completedAt: session.completedAt!, // status === COMPLETED로 조회했으므로 항상 존재
         },
         definition,

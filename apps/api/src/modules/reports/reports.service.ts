@@ -12,6 +12,11 @@ import {
   type PersonModelDiff,
   type PersonModelSnapshot,
 } from '../integration/domain/person-model-diff';
+import {
+  buildTestScoreView,
+  type ScoreViewResultInput,
+  type TestScoreView,
+} from '../integration/domain/test-score-view';
 import { findQuoteById } from './ai/quote-bank';
 import { AI_PROVIDER, type AIProvider } from './ai/ai-provider.interface';
 import { buildChatSystemPrompt } from './ai/chat-prompt-builder';
@@ -114,25 +119,22 @@ export class ReportsService {
     return { ...report, testScores, comparisonSummary, dailyQuote };
   }
 
-  private async buildTestScores(personModel: {
-    testResults: {
-      testCode: string;
-      normalizedScore: number | null;
-      band: string | null;
-      subscaleScores: { name: string; normalizedScore: number; band: string }[];
-    }[];
-  }) {
+  /**
+   * 화면용 점수 목록. 원점수(범위 포함)·0-100 환산·해석 구간을 서로 다른 필드로 내려보내
+   * 프론트가 "26/100 경미"처럼 섞어 표시하지 못하게 한다(test-score-view.ts 참고).
+   */
+  private async buildTestScores(personModel: { testResults: ScoreViewResultInput[] }): Promise<TestScoreView[]> {
     const codes = personModel.testResults.map((t) => t.testCode);
     const definitions = await this.prisma.testDefinition.findMany({ where: { code: { in: codes } } });
-    const nameByCode = new Map(definitions.map((d) => [d.code, d.name]));
+    const definitionByCode = new Map(definitions.map((d) => [d.code, d]));
 
-    return personModel.testResults.map((t) => ({
-      testCode: t.testCode,
-      testName: nameByCode.get(t.testCode) ?? t.testCode,
-      normalizedScore: t.normalizedScore,
-      band: t.band,
-      subscaleScores: t.subscaleScores.map((s) => ({ name: s.name, normalizedScore: s.normalizedScore, band: s.band })),
-    }));
+    return personModel.testResults.map((t) => {
+      const definition = definitionByCode.get(t.testCode);
+      if (!definition) {
+        throw new NotFoundException(`검사 정의 "${t.testCode}"를 찾을 수 없습니다.`);
+      }
+      return buildTestScoreView(t, definition);
+    });
   }
 
   private async computeComparisonSummary(
