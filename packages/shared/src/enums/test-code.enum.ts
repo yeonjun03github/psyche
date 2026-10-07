@@ -19,6 +19,10 @@ export enum TestCode {
   BIS11 = 'BIS11',
   CBI = 'CBI',
   AQ = 'AQ',
+  // 선택 검사 — 완료하면 통합 리포트 입력에 함께 포함된다(필수 검사 완료 여부와 무관)
+  AES = 'AES',
+  ALS18 = 'ALS18',
+  SHAPS = 'SHAPS',
 }
 
 export enum TestCategory {

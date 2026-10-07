@@ -3,7 +3,15 @@ import { normalizeToPercent, possibleRawScoreRange } from './score-normalizer';
 export interface SessionSubscaleScoreInput {
   name: string;
   rawScore: number;
-  band: string;
+  /** 절단점이 없는 하위척도는 null */
+  band: string | null;
+}
+
+export interface SessionAlternateScoreInput {
+  key: string;
+  name: string;
+  rawScore: number;
+  band: string | null;
 }
 
 export interface SessionInput {
@@ -12,12 +20,16 @@ export interface SessionInput {
   rawScore: number | null;
   band: string | null;
   subscaleScores: SessionSubscaleScoreInput[];
+  /** 보조 점수가 없는 기존 세션 문서는 비어 있거나 undefined일 수 있다 */
+  alternateScores?: SessionAlternateScoreInput[];
   completedAt: Date;
 }
 
 export interface SubscaleDefinitionInput {
   name: string;
   questionIds: string[];
+  /** 하위척도 평균 채점에서 문항 수 기준 나눗수가 따로 지정된 경우 */
+  divisor?: number | null;
 }
 
 export interface TestDefinitionInput {
@@ -28,6 +40,7 @@ export interface TestDefinitionInput {
     multiplier: number;
     divisor: number;
     subscales: SubscaleDefinitionInput[];
+    reportOverallWithSubscales?: boolean | null;
   };
 }
 
@@ -35,7 +48,15 @@ export interface PersonModelSubscaleResult {
   name: string;
   rawScore: number;
   normalizedScore: number;
-  band: string;
+  band: string | null;
+}
+
+/** 정규화하지 않고 원점수 그대로 보존하는 보조 점수(예: SHAPS 이분 점수) */
+export interface PersonModelAlternateResult {
+  key: string;
+  name: string;
+  rawScore: number;
+  band: string | null;
 }
 
 export interface PersonModelTestResultOutput {
@@ -45,6 +66,7 @@ export interface PersonModelTestResultOutput {
   normalizedScore: number | null;
   band: string | null;
   subscaleScores: PersonModelSubscaleResult[];
+  alternateScores: PersonModelAlternateResult[];
   completedAt: Date;
 }
 
@@ -57,6 +79,12 @@ export function buildPersonModelTestResult(
   definition: TestDefinitionInput,
 ): PersonModelTestResultOutput {
   const { responseScaleMin, responseScaleMax, scoringConfig } = definition;
+  const alternateScores: PersonModelAlternateResult[] = (session.alternateScores ?? []).map((a) => ({
+    key: a.key,
+    name: a.name,
+    rawScore: a.rawScore,
+    band: a.band,
+  }));
 
   if (session.subscaleScores.length > 0) {
     const subscaleScores = session.subscaleScores.map((s) => {
@@ -69,7 +97,7 @@ export function buildPersonModelTestResult(
         responseScaleMin,
         responseScaleMax,
         scoringConfig.multiplier,
-        scoringConfig.divisor,
+        subscaleDef.divisor ?? scoringConfig.divisor,
       );
       return {
         name: s.name,
@@ -79,6 +107,30 @@ export function buildPersonModelTestResult(
       };
     });
 
+    // 하위척도와 함께 전체 점수도 보고하는 검사(ALS-18의 전체 평균)는 전체 점수를 버리지 않는다.
+    if (scoringConfig.reportOverallWithSubscales) {
+      if (session.rawScore === null) {
+        throw new Error(`"${session.testCode}" 세션에 전체 점수가 없습니다.`);
+      }
+      const overallRange = possibleRawScoreRange(
+        definition.questions.length,
+        responseScaleMin,
+        responseScaleMax,
+        scoringConfig.multiplier,
+        scoringConfig.divisor,
+      );
+      return {
+        testCode: session.testCode,
+        testDefinitionVersion: session.testDefinitionVersion,
+        rawScore: session.rawScore,
+        normalizedScore: normalizeToPercent(session.rawScore, overallRange.min, overallRange.max),
+        band: session.band,
+        subscaleScores,
+        alternateScores,
+        completedAt: session.completedAt,
+      };
+    }
+
     return {
       testCode: session.testCode,
       testDefinitionVersion: session.testDefinitionVersion,
@@ -86,11 +138,13 @@ export function buildPersonModelTestResult(
       normalizedScore: null,
       band: null,
       subscaleScores,
+      alternateScores,
       completedAt: session.completedAt,
     };
   }
 
-  if (session.rawScore === null || session.band === null) {
+  // band는 절단점이 없는 검사에서 null일 수 있으므로 채점 결과의 존재 여부는 rawScore로만 판단한다.
+  if (session.rawScore === null) {
     throw new Error(`"${session.testCode}" 세션에 채점 결과가 없습니다.`);
   }
 
@@ -109,6 +163,7 @@ export function buildPersonModelTestResult(
     normalizedScore: normalizeToPercent(session.rawScore, range.min, range.max),
     band: session.band,
     subscaleScores: [],
+    alternateScores,
     completedAt: session.completedAt,
   };
 }

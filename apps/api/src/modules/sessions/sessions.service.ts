@@ -143,9 +143,13 @@ export class SessionsService {
     }
 
     const testDefinition = await this.testDefinitions.findByCode(session.testCode);
-    const questionIds = new Set(testDefinition.questions.map((q) => q.questionId));
-    if (!questionIds.has(dto.questionId)) {
+    const question = testDefinition.questions.find((q) => q.questionId === dto.questionId);
+    if (!question) {
       throw new BadRequestException(`"${dto.questionId}"는 이 검사의 문항이 아닙니다.`);
+    }
+    // 선택지에 없는 값이 저장되면 역채점·합산이 조용히 틀어지므로 응답 시점에 막는다.
+    if (!question.options.some((option) => option.value === dto.value)) {
+      throw new BadRequestException(`"${dto.questionId}"에 허용되지 않는 응답값입니다.`);
     }
 
     const answers = session.answers.filter((a) => a.questionId !== dto.questionId);
@@ -194,6 +198,7 @@ export class SessionsService {
         rawScore: result.rawScore,
         band: result.band,
         subscaleScores: result.subscaleScores,
+        alternateScores: result.alternateScores,
       },
     });
   }

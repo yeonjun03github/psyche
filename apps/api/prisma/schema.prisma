@@ -66,6 +66,9 @@ type Subscale {
   name        String
   questionIds String[]
   bands       ScoreBand[]
+  /// 하위척도마다 문항 수가 달라 평균(ALS-18: 5/8/5문항)을 구해야 할 때만 지정한다.
+  /// 비어 있으면 ScoringConfig.divisor를 쓴다.
+  divisor     Int?
 }
 
 /// 위기 신호 문항 정의 — 안전장치(2.4절)의 근거 데이터
@@ -82,9 +85,46 @@ type RiskFlag {
 type ScoringConfig {
   multiplier Int         @default(1)
   divisor    Int         @default(1)
+  /// 비어 있으면 "확립된 절단점이 없는 검사"다 — 이때 band는 null이며 임의 구간을 만들지 않는다.
   bands      ScoreBand[]
   subscales  Subscale[]
   riskFlags  RiskFlag[]
+  /// true면 하위척도가 있어도 전체 점수(rawScore)를 함께 계산한다(ALS-18의 전체 평균).
+  /// 비어 있으면 기존 동작(하위척도만 있는 검사는 전체 점수 없음, 예: Big Five)을 따른다.
+  reportOverallWithSubscales Boolean?
+  /// 주 점수(rawScore) 외에 같은 응답에서 구하는 보조 점수. SHAPS의 이분(binary) 점수처럼
+  /// 주 점수로 환산하면 정보가 사라지는 경우에 원래 점수를 그대로 보존하기 위해 쓴다.
+  alternateScores AlternateScoring[]
+}
+
+/// 보조 점수 채점 규칙. 문항 점수는 "역채점 보정이 끝난 값" 기준이다.
+/// kind=BINARY_SUM이면 보정된 점수가 threshold 이상일 때 1점, 아니면 0점으로 합산한다.
+type AlternateScoring {
+  key       String
+  name      String
+  kind      String
+  threshold Int?
+  min       Float
+  max       Float
+  /// 비어 있으면 절단점 없음(band null)
+  bands     ScoreBand[]
+}
+
+/// 점수를 해석할 때 필요한 검사 자체의 정보. 화면 안내와 AI 프롬프트가 같은 값을 공유한다.
+type TestMeta {
+  /// 측정하는 개념
+  concept               String
+  /// 점수 방향(예: "높을수록 무의욕 경향이 강함")
+  scoreDirection        String
+  /// 주 점수의 이름(예: 총점, 전체 평균). 없으면 채점 공식에서 유도한다.
+  scoreLabel            String?
+  /// 확립된 절단점이 있는지
+  hasCutoff             Boolean
+  /// PUBLISHED_KOREAN_VERSION(번역·타당화 논문이 있는 한국판 — 출처 기재 기준이며 이 앱 문구의 원문 대조는 별도) | UNOFFICIAL_TRANSLATION(비공식 번역)
+  translationStatus     String
+  translationNote       String?
+  /// 해석 시 주의사항
+  interpretationCaveats String[]
 }
 
 type LicenseInfo {
@@ -106,6 +146,7 @@ model TestDefinition {
   license           LicenseInfo
   questions         Question[]
   scoringConfig     ScoringConfig
+  meta              TestMeta?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -131,7 +172,16 @@ type Answer {
 type SessionSubscaleScore {
   name     String
   rawScore Float
-  band     String
+  /// 절단점이 없는 하위척도는 null
+  band     String?
+}
+
+/// 주 점수 외 보조 점수(예: SHAPS 이분 점수). 원점수 그대로 보존한다.
+type SessionAlternateScore {
+  key      String
+  name     String
+  rawScore Float
+  band     String?
 }
 
 model TestSession {
@@ -148,7 +198,8 @@ model TestSession {
   rawScore              Float?
   band                  String?
   subscaleScores        SessionSubscaleScore[]
-  riskTriggered         Boolean                @default(false)
+  alternateScores       SessionAlternateScore[]
+  riskTriggered        Boolean                @default(false)
 
   @@index([userId, testCode])
   @@map("test_sessions")
@@ -162,7 +213,15 @@ type PersonModelSubscaleScore {
   name            String
   rawScore        Float
   normalizedScore Int
-  band            String
+  band            String?
+}
+
+/// 정규화하지 않는 보조 점수(예: SHAPS 이분 점수). 원점수 범위는 TestDefinition에서 유도한다.
+type PersonModelAlternateScore {
+  key      String
+  name     String
+  rawScore Float
+  band     String?
 }
 
 /// rawScore/normalizedScore/band는 단일 척도 검사(예: PHQ-9)에서만 채워지고,
@@ -174,6 +233,7 @@ type PersonModelTestResult {
   normalizedScore       Int?
   band                  String?
   subscaleScores        PersonModelSubscaleScore[]
+  alternateScores       PersonModelAlternateScore[]
   completedAt           DateTime
 }
 
