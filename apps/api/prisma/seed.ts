@@ -1,12 +1,12 @@
 import 'dotenv/config';
 import * as argon2 from 'argon2';
 import { PrismaClient } from '../src/generated/prisma';
-import { essentialTestDefinitions } from './seed/index';
+import { allTestDefinitions } from './seed/index';
 
 const prisma = new PrismaClient();
 
 async function seedTestDefinitions(): Promise<void> {
-  for (const testDefinition of essentialTestDefinitions) {
+  for (const testDefinition of allTestDefinitions) {
     const { code, ...data } = testDefinition;
     await prisma.testDefinition.upsert({
       where: { code },
