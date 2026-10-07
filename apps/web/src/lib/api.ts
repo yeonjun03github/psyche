@@ -81,16 +81,46 @@ export interface Question {
   reverseScored: boolean;
 }
 
+/** 검사 자체의 해석 정보. 메타데이터가 없는 기존 검사는 null이다. */
+export interface TestMeta {
+  concept: string;
+  scoreDirection: string;
+  scoreLabel?: string | null;
+  hasCutoff: boolean;
+  /** PUBLISHED_KOREAN_VERSION | UNOFFICIAL_TRANSLATION */
+  translationStatus: string;
+  translationNote?: string | null;
+  interpretationCaveats: string[];
+}
+
+/** 검사 정의에서 유도된 원점수 범위 — 원점수는 항상 이 범위와 함께 표시한다. */
+export interface ScoreRanges {
+  scoreLabel: string;
+  overall: { min: number; max: number } | null;
+  subscales: { name: string; min: number; max: number }[];
+  alternateScores: { key: string; name: string; min: number; max: number }[];
+}
+
 export interface TestDetail extends TestSummary {
   responseScaleMin: number;
   responseScaleMax: number;
   questions: Question[];
+  meta?: TestMeta | null;
+  scoreRanges?: ScoreRanges;
 }
 
 export interface SubscaleScore {
   name: string;
   rawScore: number;
-  band: string;
+  /** 절단점이 없는 하위척도는 null */
+  band: string | null;
+}
+
+export interface SessionAlternateScore {
+  key: string;
+  name: string;
+  rawScore: number;
+  band: string | null;
 }
 
 export interface Answer {
@@ -111,6 +141,8 @@ export interface SessionDto {
   rawScore: number | null;
   band: string | null;
   subscaleScores: SubscaleScore[];
+  /** 주 점수 외 보조 점수(예: SHAPS 이분 점수). 이전 세션에는 비어 있다. */
+  alternateScores?: SessionAlternateScore[];
   riskTriggered: boolean;
 }
 
@@ -135,12 +167,36 @@ export interface ComparisonSummary {
   testDiffs: TestDiff[];
 }
 
+/**
+ * 리포트 화면용 검사 점수. 세 가지 값을 절대 섞지 않는다.
+ * - rawScore/displayRawScore: 검사 고유 척도의 원점수(범위 포함)
+ * - normalizedScore: 0-100 환산 — 원점수가 범위 안에서 어디쯤인지 보여주는 상대 위치(원점수도 임상 기준도 아님)
+ * - band: 검사에 확립된 해석 구간이 있을 때만 값이 있다(없으면 null)
+ */
 export interface TestScoreItem {
   testCode: string;
   testName: string;
+  scoreLabel?: string;
+  rawScore?: number | null;
+  /** 예: "38점 (범위 18–72)" */
+  displayRawScore?: string | null;
   normalizedScore: number | null;
   band: string | null;
-  subscaleScores: { name: string; normalizedScore: number; band: string }[];
+  subscaleScores: {
+    name: string;
+    normalizedScore: number;
+    band: string | null;
+    displayRawScore?: string | null;
+  }[];
+  alternateScores?: { key: string; name: string; displayRawScore: string; band: string | null }[];
+  meta?: {
+    concept: string;
+    scoreDirection: string;
+    hasCutoff: boolean;
+    translationStatus: string;
+    translationNote: string | null;
+    interpretationCaveats: string[];
+  } | null;
 }
 
 export interface ReportDto {

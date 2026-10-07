@@ -22,6 +22,27 @@ function representativeSessionByCode(sessions: Awaited<ReturnType<typeof api.get
     .sort((a, b) => new Date(b.completedAt ?? 0).getTime() - new Date(a.completedAt ?? 0).getTime())[0];
 }
 
+type TestListItem = Awaited<ReturnType<typeof api.getTests>>[number];
+
+function TestRow({ test, sessions }: { test: TestListItem; sessions: Awaited<ReturnType<typeof api.getSessions>> }) {
+  const session = representativeSessionByCode(sessions, test.code);
+  const status = session?.status ?? 'NOT_STARTED';
+  const label =
+    status === 'COMPLETED' ? `완료 (${session!.band ?? '결과 확인'})` : status === 'IN_PROGRESS' ? '진행 중' : '시작 전';
+
+  return (
+    <li>
+      <Link
+        href={`/tests/${test.code}`}
+        className="flex items-center justify-between rounded-lg border border-neutral-200 px-4 py-3 text-sm hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+      >
+        <span>{test.name}</span>
+        <span className="text-neutral-500">{label}</span>
+      </Link>
+    </li>
+  );
+}
+
 export default async function Home() {
   const token = (await cookies()).get(ACCESS_TOKEN_COOKIE)?.value;
   const isAdmin = decodeAccessTokenRole(token) === 'ADMIN';
@@ -32,6 +53,7 @@ export default async function Home() {
   ]);
 
   const essentialTests = tests.filter((t) => t.category === 'ESSENTIAL');
+  const optionalTests = tests.filter((t) => t.category === 'OPTIONAL');
   const completedCount = essentialTests.filter(
     (t) => representativeSessionByCode(sessions, t.code)?.status === 'COMPLETED',
   ).length;
@@ -66,26 +88,25 @@ export default async function Home() {
           <ResetAllButton />
         </div>
         <ul className="flex flex-col gap-2">
-          {essentialTests.map((test) => {
-            const session = representativeSessionByCode(sessions, test.code);
-            const status = session?.status ?? 'NOT_STARTED';
-            const label =
-              status === 'COMPLETED' ? `완료 (${session!.band ?? '결과 확인'})` : status === 'IN_PROGRESS' ? '진행 중' : '시작 전';
-
-            return (
-              <li key={test.code}>
-                <Link
-                  href={`/tests/${test.code}`}
-                  className="flex items-center justify-between rounded-lg border border-neutral-200 px-4 py-3 text-sm hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
-                >
-                  <span>{test.name}</span>
-                  <span className="text-neutral-500">{label}</span>
-                </Link>
-              </li>
-            );
-          })}
+          {essentialTests.map((test) => (
+            <TestRow key={test.code} test={test} sessions={sessions} />
+          ))}
         </ul>
       </section>
+
+      {optionalTests.length > 0 && (
+        <section>
+          <h2 className="text-lg font-medium">선택 검사</h2>
+          <p className="mb-3 mt-1 text-sm text-neutral-500">
+            필수 검사가 아니라 건너뛰어도 리포트를 만들 수 있습니다. 완료한 선택 검사는 통합 리포트에 함께 반영됩니다.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {optionalTests.map((test) => (
+              <TestRow key={test.code} test={test} sessions={sessions} />
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-3 text-lg font-medium">통합 리포트</h2>
