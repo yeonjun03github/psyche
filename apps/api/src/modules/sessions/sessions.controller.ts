@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { SessionsService } from './sessions.service';
+import { RESET_SCOPES, SessionsService, type ResetScope } from './sessions.service';
 import { SaveAnswerDto } from './dto/save-answer.dto';
 
 @ApiTags('sessions')
@@ -25,8 +25,12 @@ export class SessionsController {
 
   // ':id' 라우트보다 먼저 선언해야 'reset'/'reset-all'이 :id로 매칭되지 않는다.
   @Post('sessions/reset')
-  resetInProgress() {
-    return this.sessionsService.abandonAllInProgress();
+  resetInProgress(@Query('scope') scope: string = 'essential') {
+    // scope를 생략하면 기존 동작(필수 검사)을 유지한다.
+    if (!RESET_SCOPES.includes(scope as ResetScope)) {
+      throw new BadRequestException('scope는 essential 또는 optional이어야 합니다.');
+    }
+    return this.sessionsService.abandonInProgress(scope as ResetScope);
   }
 
   @Post('sessions/reset-all')

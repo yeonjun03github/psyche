@@ -9,6 +9,10 @@ import type { SaveAnswerDto } from './dto/save-answer.dto';
 
 const scorer = new GenericTestScorer();
 
+/** 진행 중인 검사 초기화 범위. 전체 결과 삭제(resetAll)와는 별개다. */
+export type ResetScope = 'essential' | 'optional';
+export const RESET_SCOPES: readonly ResetScope[] = ['essential', 'optional'];
+
 @Injectable()
 export class SessionsService {
   constructor(
@@ -69,19 +73,32 @@ export class SessionsService {
   }
 
   /**
-   * 대시보드의 "필수 검사 초기화" 기능. 진행 중인 세션들만 ABANDONED 처리하고,
-   * 완료된 검사의 과거 결과(TestSession, PersonModel, AIReport)는 절대 건드리지 않는다.
+   * 대시보드의 "진행 중인 필수/선택 검사 초기화" 기능. scope에 해당하는 검사의 진행 중인 세션만
+   * ABANDONED 처리하고, 완료된 검사의 과거 결과(TestSession, PersonModel, AIReport)와 다른 scope의
+   * 진행 중 세션은 절대 건드리지 않는다. 선택 검사 코드는 필수 검사처럼 하드코딩하지 않고 DB의
+   * category=OPTIONAL 정의에서 가져온다(person-model-builder와 같은 기준).
    */
-  async abandonAllInProgress(): Promise<{ abandonedCount: number }> {
+  async abandonInProgress(scope: ResetScope): Promise<{ abandonedCount: number }> {
     const userId = await this.currentUser.getUserId();
-    const essentialCodes: string[] = [...ESSENTIAL_TEST_CODES];
+    const codes = await this.codesForScope(scope);
 
     const result = await this.prisma.testSession.updateMany({
-      where: { userId, testCode: { in: essentialCodes }, status: 'IN_PROGRESS' },
+      where: { userId, testCode: { in: codes }, status: 'IN_PROGRESS' },
       data: { status: 'ABANDONED' },
     });
 
     return { abandonedCount: result.count };
+  }
+
+  private async codesForScope(scope: ResetScope): Promise<string[]> {
+    if (scope === 'essential') {
+      return [...ESSENTIAL_TEST_CODES];
+    }
+    const optional = await this.prisma.testDefinition.findMany({
+      where: { category: 'OPTIONAL' },
+      select: { code: true },
+    });
+    return optional.map((d) => d.code);
   }
 
   /**

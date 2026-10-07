@@ -269,7 +269,8 @@ export const api = {
     }),
   submitSession: (sessionId: string) =>
     request<SessionDto>(`/sessions/${sessionId}/submit`, { method: 'POST' }),
-  resetInProgressSessions: () => request<{ abandonedCount: number }>('/sessions/reset', { method: 'POST' }),
+  resetInProgressSessions: (scope: 'essential' | 'optional') =>
+    request<{ abandonedCount: number }>(`/sessions/reset?scope=${scope}`, { method: 'POST' }),
   resetAllSessions: () =>
     request<{ deletedSessionCount: number; deletedPersonModelCount: number; deletedReportCount: number }>(
       '/sessions/reset-all',

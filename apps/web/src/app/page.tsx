@@ -61,6 +61,9 @@ export default async function Home() {
   const hasInProgress = essentialTests.some(
     (t) => representativeSessionByCode(sessions, t.code)?.status === 'IN_PROGRESS',
   );
+  const hasOptionalInProgress = optionalTests.some(
+    (t) => representativeSessionByCode(sessions, t.code)?.status === 'IN_PROGRESS',
+  );
 
   return (
     <main className="mx-auto flex max-w-2xl flex-1 flex-col gap-8 p-8">
@@ -96,10 +99,13 @@ export default async function Home() {
 
       {optionalTests.length > 0 && (
         <section>
-          <h2 className="text-lg font-medium">선택 검사</h2>
-          <p className="mb-3 mt-1 text-sm text-neutral-500">
-            필수 검사가 아니라 건너뛰어도 리포트를 만들 수 있습니다. 완료한 선택 검사는 통합 리포트에 함께 반영됩니다.
-          </p>
+          <div className="mb-3 flex flex-col items-start gap-1">
+            <h2 className="text-lg font-medium">선택 검사</h2>
+            <p className="text-sm text-neutral-500">
+              필수 검사가 아니라 건너뛰어도 리포트를 만들 수 있습니다. 완료한 선택 검사는 통합 리포트에 함께 반영됩니다.
+            </p>
+            <ResetProgressButton scope="optional" disabled={!hasOptionalInProgress} />
+          </div>
           <ul className="flex flex-col gap-2">
             {optionalTests.map((test) => (
               <TestRow key={test.code} test={test} sessions={sessions} />
